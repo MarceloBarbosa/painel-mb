@@ -118,13 +118,7 @@
     <script>
         const coresPadrao = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
         let chartInstance = null;
-        let dadosEtiquetas = [
-            { nome: 'Novo Lead', quantidade: 42, cor: '#3b82f6' },
-            { nome: 'Orçamento Enviado', quantidade: 28, cor: '#f59e0b' },
-            { nome: 'Pagamento Pendente', quantidade: 15, cor: '#ef4444' },
-            { nome: 'Pedido Pago', quantidade: 64, cor: '#10b981' },
-            { nome: 'Suporte', quantidade: 9, cor: '#8b5cf6' }
-        ];
+        let dadosEtiquetas = [];
 
         function definirStatus(texto, estilo) {
             const badge = document.getElementById('status-conexao');
