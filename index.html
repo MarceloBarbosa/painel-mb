@@ -215,15 +215,29 @@
             });
         }
 
+        async function buscarConversas() {
+            return evoFetch(`/chat/findChats/${encodeURIComponent(EVO.instance)}`, { method: 'POST', body: JSON.stringify({}) });
+        }
+
         async function atualizarDados() {
             if (EVO.url && EVO.instance && EVO.key) {
                 definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
                 try {
                     const etiquetas = await buscarEtiquetas();
                     const lista = Array.isArray(etiquetas) ? etiquetas : (etiquetas?.labels || []);
+                    const conversas = await buscarConversas();
+                    const chats = Array.isArray(conversas) ? conversas : (conversas?.chats || conversas?.data || []);
+                    if (chats.length) console.log('Exemplo de conversa da Evolution:', chats[0]);
+                    const contagem = {};
+                    chats.forEach(c => {
+                        (c.labels || []).forEach(l => {
+                            const chave = typeof l === 'string' ? l : (l.id ?? l.labelId ?? l.name);
+                            contagem[chave] = (contagem[chave] || 0) + 1;
+                        });
+                    });
                     dadosEtiquetas = lista.map((e, i) => ({
                         nome: String(e.name ?? 'Sem nome'),
-                        quantidade: Number(e.count ?? 0) || 0,
+                        quantidade: contagem[e.id] ?? contagem[e.name] ?? 0,
                         cor: /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : coresPadrao[i % coresPadrao.length]
                     }));
                     renderizarPainel(dadosEtiquetas);
