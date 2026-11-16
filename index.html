@@ -1,328 +1,86 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#059669">
-    <title>ZapPainel Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body {
-            -webkit-tap-highlight-color: transparent;
-            background-color: #f3f4f6;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#059669">
+  <title>ZapPainel Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>body{-webkit-tap-highlight-color:transparent;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}</style>
 </head>
 <body class="pb-20 text-gray-800">
-    <header class="bg-emerald-600 text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <i data-lucide="message-square" class="w-6 h-6"></i>
-            <h1 class="font-bold text-lg tracking-tight">ZapPainel</h1>
-        </div>
-        <button onclick="abrirModalConfig()" aria-label="Configurações" class="p-2 rounded-full hover:bg-emerald-700 active:bg-emerald-800 transition">
-            <i data-lucide="settings" class="w-5 h-5"></i>
-        </button>
-    </header>
-
-    <main class="p-4 max-w-md mx-auto space-y-4">
-        <section id="aba-etiquetas" class="space-y-4">
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                <div>
-                    <p class="text-xs text-gray-500 uppercase font-semibold">Total Etiquetados</p>
-                    <h2 id="total-contatos" class="text-2xl font-extrabold text-gray-900">0</h2>
-                </div>
-                <button onclick="atualizarDados()" class="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 active:scale-95 transition">
-                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                    Atualizar
-                </button>
-            </div>
-
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-bold text-gray-700 text-base">Distribuição por Etiqueta</h3>
-                    <span id="status-conexao" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Modo Teste</span>
-                </div>
-                <div class="relative w-full h-64 flex justify-center items-center">
-                    <canvas id="graficoEtiquetas" aria-label="Gráfico de distribuição por etiqueta" role="img"></canvas>
-                    <p id="aviso-grafico" class="hidden absolute inset-0 flex items-center justify-center text-center text-sm text-gray-500 px-6"></p>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-700 text-sm mb-3">Detalhamento</h3>
-                <div id="lista-etiquetas" class="space-y-2.5"></div>
-            </div>
-        </section>
-
-        <section id="aba-funcoes" class="hidden space-y-4">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 text-center space-y-2">
-                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                    <i data-lucide="plus-circle" class="w-6 h-6"></i>
-                </div>
-                <h3 class="font-bold text-gray-800">Módulos Expansíveis</h3>
-                <p class="text-sm text-gray-500">Área reservada para as próximas funções do seu painel.</p>
-            </div>
-        </section>
-    </main>
-
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 z-20 max-w-md mx-auto">
-        <button onclick="mudarAba('etiquetas')" id="nav-etiquetas" class="flex flex-col items-center text-emerald-600 font-semibold text-xs py-1 px-4">
-            <i data-lucide="pie-chart" class="w-5 h-5 mb-1"></i>
-            Etiquetas
-        </button>
-        <button onclick="mudarAba('funcoes')" id="nav-funcoes" class="flex flex-col items-center text-gray-400 font-medium text-xs py-1 px-4">
-            <i data-lucide="grid" class="w-5 h-5 mb-1"></i>
-            Mais Funções
-        </button>
-    </nav>
-
-    <div id="modal-config" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-30" onclick="if (event.target === this) fecharModalConfig()">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3" role="dialog" aria-modal="true" aria-labelledby="titulo-config">
-            <div class="flex justify-between items-center">
-                <h3 id="titulo-config" class="font-bold text-lg">Conexão Evolution API</h3>
-                <button onclick="fecharModalConfig()" aria-label="Fechar" class="text-gray-400 hover:text-gray-600">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <p class="text-xs text-gray-500">Informe os dados da sua Evolution API para buscar as etiquetas. A chave fica somente nesta sessão do navegador.</p>
-            <div>
-                <label for="evo-url" class="block text-xs font-semibold text-gray-700 mb-1">URL da Evolution API</label>
-                <input type="url" id="evo-url" placeholder="https://sua-evolution-api.com" autocomplete="url" class="w-full border border-gray-300 rounded-xl p-2 text-sm">
-            </div>
-            <div>
-                <label for="evo-instance" class="block text-xs font-semibold text-gray-700 mb-1">Nome da Instância</label>
-                <input type="text" id="evo-instance" placeholder="minha_instancia" autocomplete="off" class="w-full border border-gray-300 rounded-xl p-2 text-sm">
-            </div>
-            <div>
-                <label for="evo-apikey" class="block text-xs font-semibold text-gray-700 mb-1">Global API Key</label>
-                <input type="password" id="evo-apikey" placeholder="Sua chave secreta" autocomplete="new-password" class="w-full border border-gray-300 rounded-xl p-2 text-sm">
-            </div>
-            <div class="flex gap-2 pt-2">
-                <button onclick="salvarConfig()" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-sm active:scale-95 transition">
-                    Salvar e Conectar
-                </button>
-            </div>
-            <button onclick="limparConfig()" class="w-full text-xs text-red-600 py-1">Remover configurações salvas</button>
-        </div>
+  <header class="bg-emerald-600 text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
+    <div class="flex items-center gap-2"><i data-lucide="message-square" class="w-6 h-6"></i><h1 class="font-bold text-lg tracking-tight">ZapPainel</h1></div>
+    <button onclick="abrirModalConfig()" aria-label="Configurações" class="p-2 rounded-full hover:bg-emerald-700"><i data-lucide="settings" class="w-5 h-5"></i></button>
+  </header>
+  <main class="p-4 max-w-md mx-auto space-y-4">
+    <section id="aba-etiquetas" class="space-y-4">
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+        <div><p class="text-xs text-gray-500 uppercase font-semibold">Total Etiquetados</p><h2 id="total-contatos" class="text-2xl font-extrabold text-gray-900">0</h2></div>
+        <button onclick="atualizarDados()" class="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-4 h-4"></i>Atualizar</button>
+      </div>
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-gray-700">Distribuição por Etiqueta</h3><span id="status-conexao" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Modo Teste</span></div>
+        <div class="relative w-full h-64"><canvas id="graficoEtiquetas" aria-label="Gráfico de etiquetas" role="img"></canvas><p id="aviso-grafico" class="hidden absolute inset-0 flex items-center justify-center text-center text-sm text-gray-500 px-6"></p></div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100"><h3 class="font-bold text-gray-700 text-sm mb-3">Detalhamento</h3><div id="lista-etiquetas" class="space-y-2.5"></div></div>
+    </section>
+    <section id="aba-funcoes" class="hidden"><div class="bg-white p-5 rounded-2xl shadow-sm border text-center"><h3 class="font-bold">Módulos Expansíveis</h3><p class="text-sm text-gray-500">Área reservada para as próximas funções do seu painel.</p></div></section>
+  </main>
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 z-20 max-w-md mx-auto">
+    <button onclick="mudarAba('etiquetas')" id="nav-etiquetas" class="flex flex-col items-center text-emerald-600 font-semibold text-xs py-1 px-4"><i data-lucide="pie-chart" class="w-5 h-5 mb-1"></i>Etiquetas</button>
+    <button onclick="mudarAba('funcoes')" id="nav-funcoes" class="flex flex-col items-center text-gray-400 text-xs py-1 px-4"><i data-lucide="grid" class="w-5 h-5 mb-1"></i>Mais Funções</button>
+  </nav>
+  <div id="modal-config" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-30" onclick="if(event.target===this)fecharModalConfig()">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3" role="dialog" aria-modal="true" aria-labelledby="titulo-config">
+      <div class="flex justify-between items-center"><h3 id="titulo-config" class="font-bold text-lg">Conexão Evolution API (Hugging Face)</h3><button onclick="fecharModalConfig()" aria-label="Fechar"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+      <p class="text-xs text-gray-500">Use o endereço público do Space. A rota chamada é <code>/label/findLabels/{instância}</code>. A API precisa permitir CORS para este site.</p>
+      <div><label for="evo-url" class="block text-xs font-semibold mb-1">URL do Space / API</label><input type="url" id="evo-url" placeholder="https://marce1o-evo-api.hf.space" class="w-full border rounded-xl p-2 text-sm"></div>
+      <div><label for="evo-instance" class="block text-xs font-semibold mb-1">Nome da Instância</label><input type="text" id="evo-instance" placeholder="minha_instancia" class="w-full border rounded-xl p-2 text-sm"></div>
+      <div><label for="evo-apikey" class="block text-xs font-semibold mb-1">API Key</label><input type="password" id="evo-apikey" autocomplete="new-password" placeholder="Sua chave secreta" class="w-full border rounded-xl p-2 text-sm"></div>
+      <button onclick="salvarConfig()" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-sm">Salvar e Conectar</button>
+      <button onclick="limparConfig()" class="w-full text-xs text-red-600 py-1">Remover configurações salvas</button>
     </div>
-
-    <script>
-        const coresPadrao = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
-        let chartInstance = null;
-        let dadosEtiquetas = [
-            { nome: 'Novo Lead (Exemplo)', quantidade: 42, cor: '#3b82f6' },
-            { nome: 'Orçamento (Exemplo)', quantidade: 28, cor: '#f59e0b' },
-            { nome: 'Pago (Exemplo)', quantidade: 64, cor: '#10b981' }
-        ];
-
-        function definirStatus(texto, estilo) {
-            const badge = document.getElementById('status-conexao');
-            badge.textContent = texto;
-            badge.className = `text-[11px] px-2 py-0.5 rounded-full font-medium ${estilo}`;
-        }
-
-        function extrairEtiquetas(payload) {
-            if (Array.isArray(payload)) return payload;
-            if (Array.isArray(payload?.labels)) return payload.labels;
-            if (Array.isArray(payload?.data)) return payload.data;
-            if (Array.isArray(payload?.etiquetas)) return payload.etiquetas;
-            throw new Error('A resposta da API não contém uma lista de etiquetas reconhecida.');
-        }
-
-        function normalizarEtiquetas(payload) {
-            return extrairEtiquetas(payload).map((item, index) => {
-                const nome = item.name ?? item.nome ?? item.label;
-                if (!nome) return null;
-                const valor = item.count ?? item.total ?? item.quantity ?? item.quantidade ?? item.chats?.length ?? item.contacts?.length;
-                const quantidade = valor === undefined || valor === null ? null : Number(valor);
-                const cor = typeof item.color === 'string' && /^#[0-9a-f]{6}$/i.test(item.color)
-                    ? item.color
-                    : (typeof item.cor === 'string' && /^#[0-9a-f]{6}$/i.test(item.cor) ? item.cor : coresPadrao[index % coresPadrao.length]);
-                return {
-                    nome: String(nome),
-                    quantidade: Number.isFinite(quantidade) && quantidade >= 0 ? quantidade : null,
-                    cor
-                };
-            }).filter(Boolean);
-        }
-
-        function renderizarPainel(dados) {
-            const quantidadesConhecidas = dados.every(item => Number.isFinite(item.quantidade));
-            const total = quantidadesConhecidas ? dados.reduce((acc, item) => acc + item.quantidade, 0) : null;
-            document.getElementById('total-contatos').textContent = total === null ? '—' : total.toLocaleString('pt-BR');
-
-            const listaEl = document.getElementById('lista-etiquetas');
-            listaEl.replaceChildren();
-            if (dados.length === 0) {
-                const vazio = document.createElement('p');
-                vazio.className = 'text-sm text-gray-500 py-2';
-                vazio.textContent = 'Nenhuma etiqueta encontrada.';
-                listaEl.appendChild(vazio);
-            }
-
-            dados.forEach(item => {
-                const percentual = total !== null && total > 0 && item.quantidade !== null
-                    ? `${((item.quantidade / total) * 100).toFixed(1)}%`
-                    : '—';
-                const linha = document.createElement('div');
-                linha.className = 'flex items-center justify-between p-2 rounded-lg bg-gray-50';
-                const nomeArea = document.createElement('div');
-                nomeArea.className = 'flex items-center gap-2.5 min-w-0';
-                const ponto = document.createElement('span');
-                ponto.className = 'w-3.5 h-3.5 rounded-full inline-block shrink-0';
-                ponto.style.backgroundColor = item.cor;
-                const nome = document.createElement('span');
-                nome.className = 'text-sm font-medium text-gray-700 truncate';
-                nome.textContent = item.nome;
-                nomeArea.append(ponto, nome);
-                const valor = document.createElement('div');
-                valor.className = 'text-right shrink-0 ml-2';
-                const quantidade = document.createElement('span');
-                quantidade.className = 'text-sm font-bold text-gray-900';
-                quantidade.textContent = item.quantidade === null ? '—' : item.quantidade.toLocaleString('pt-BR');
-                const pct = document.createElement('span');
-                pct.className = 'text-xs text-gray-400 ml-1';
-                pct.textContent = `(${percentual})`;
-                valor.append(quantidade, pct);
-                linha.append(nomeArea, valor);
-                listaEl.appendChild(linha);
-            });
-
-            const aviso = document.getElementById('aviso-grafico');
-            const canvas = document.getElementById('graficoEtiquetas');
-            if (chartInstance) {
-                chartInstance.destroy();
-                chartInstance = null;
-            }
-            if (!quantidadesConhecidas) {
-                canvas.classList.add('invisible');
-                aviso.textContent = 'A API retornou as etiquetas, mas não informou a quantidade de contatos por etiqueta.';
-                aviso.classList.remove('hidden');
-                return;
-            }
-            aviso.classList.add('hidden');
-            canvas.classList.remove('invisible');
-            if (typeof Chart === 'undefined') {
-                definirStatus('Gráfico indisponível', 'bg-red-100 text-red-800');
-                return;
-            }
-            chartInstance = new Chart(canvas.getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: dados.map(item => item.nome),
-                    datasets: [{
-                        data: dados.map(item => item.quantidade),
-                        backgroundColor: dados.map(item => item.cor),
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15, font: { size: 12 } } }
-                    }
-                }
-            });
-        }
-
-        async function atualizarDados() {
-            const url = localStorage.getItem('evo_url');
-            const instance = localStorage.getItem('evo_instance');
-            const apikey = sessionStorage.getItem('evo_apikey');
-
-            if (!url || !instance || !apikey) {
-                renderizarPainel(dadosEtiquetas);
-                definirStatus('Modo Teste', 'bg-amber-100 text-amber-800');
-                return;
-            }
-
-            definirStatus('Lendo WhatsApp...', 'bg-blue-100 text-blue-800');
-            try {
-                const baseUrl = url.replace(/\/+$/, '');
-                const endpoint = `${baseUrl}/label/findLabels/${encodeURIComponent(instance)}`;
-                const resposta = await fetch(endpoint, {
-                    method: 'GET',
-                    headers: { apikey, Accept: 'application/json' }
-                });
-                if (!resposta.ok) throw new Error(`A Evolution API respondeu com HTTP ${resposta.status}.`);
-                const etiquetas = normalizarEtiquetas(await resposta.json());
-                dadosEtiquetas = etiquetas;
-                renderizarPainel(dadosEtiquetas);
-                definirStatus('Conectado', 'bg-emerald-100 text-emerald-800');
-            } catch (erro) {
-                console.error('Falha ao carregar etiquetas:', erro);
-                definirStatus('Falha na conexão', 'bg-red-100 text-red-800');
-                alert(`Não foi possível carregar as etiquetas. Confira a URL, a instância, a API Key, as permissões de CORS e a versão da Evolution API.\n\n${erro.message}`);
-            }
-        }
-
-        function abrirModalConfig() {
-            document.getElementById('evo-url').value = localStorage.getItem('evo_url') || '';
-            document.getElementById('evo-instance').value = localStorage.getItem('evo_instance') || '';
-            document.getElementById('evo-apikey').value = sessionStorage.getItem('evo_apikey') || '';
-            const modal = document.getElementById('modal-config');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function fecharModalConfig() {
-            const modal = document.getElementById('modal-config');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
-        async function salvarConfig() {
-            const urlCampo = document.getElementById('evo-url');
-            const instance = document.getElementById('evo-instance').value.trim();
-            const apikey = document.getElementById('evo-apikey').value.trim();
-            let url;
-            try {
-                url = new URL(urlCampo.value.trim());
-                if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
-                    throw new Error('Use HTTPS para a URL da Evolution API.');
-                }
-                if (!instance || !apikey) throw new Error('Preencha o nome da instância e a API Key.');
-            } catch (erro) {
-                alert(erro.message || 'Informe uma URL válida para a Evolution API.');
-                return;
-            }
-            localStorage.setItem('evo_url', url.origin + url.pathname.replace(/\/+$/, ''));
-            localStorage.setItem('evo_instance', instance);
-            sessionStorage.setItem('evo_apikey', apikey);
-            fecharModalConfig();
-            await atualizarDados();
-        }
-
-        function limparConfig() {
-            localStorage.removeItem('evo_url');
-            localStorage.removeItem('evo_instance');
-            sessionStorage.removeItem('evo_apikey');
-            dadosEtiquetas = [
-                { nome: 'Novo Lead (Exemplo)', quantidade: 42, cor: '#3b82f6' },
-                { nome: 'Orçamento (Exemplo)', quantidade: 28, cor: '#f59e0b' },
-                { nome: 'Pago (Exemplo)', quantidade: 64, cor: '#10b981' }
-            ];
-            fecharModalConfig();
-            renderizarPainel(dadosEtiquetas);
-            definirStatus('Modo Teste', 'bg-amber-100 text-amber-800');
-        }
-
-        function mudarAba(aba) {
-            const etiquetasAtiva = aba === 'etiquetas';
-            document.getElementById('aba-etiquetas').classList.toggle('hidden', !etiquetasAtiva);
-            document.getElementById('aba-funcoes').classList.toggle('hidden', etiquetasAtiva);
-            document.getElementById('nav-etiquetas').className = `flex flex-col items-center ${etiquetasAtiva ? 'text-emerald-600 font-semibold' : 'text-gray-400 font-medium'} text-xs py-1 px-4`;
-            document.getElementById('nav-funcoes').className = `flex flex-col items-center ${!etiquetasAtiva ? 'text-emerald-600 font-semibold' : 'text-gray-400 font-medium'} text-xs py-1 px-4`;
-        }
-
-        if (window.lucide) lucide.createIcons();
-        renderizarPainel(dadosEtiquetas);
-        atualizarDados();
-    </script>
+  </div>
+  <script>
+    // URL do Space informado. Pode ser alterada na tela de configurações.
+    const URL_API_PADRAO = 'https://marce1o-evo-api.hf.space';
+    const CORES = ['#3b82f6','#f59e0b','#ef4444','#10b981','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+    let chartInstance = null;
+    let dadosEtiquetas = [
+      {nome:'Novo Lead (Exemplo)',quantidade:42,cor:CORES[0]},
+      {nome:'Orçamento (Exemplo)',quantidade:28,cor:CORES[1]},
+      {nome:'Pago (Exemplo)',quantidade:64,cor:CORES[3]}
+    ];
+    function definirStatus(texto, estilo){const badge=document.getElementById('status-conexao');badge.textContent=texto;badge.className=`text-[11px] px-2 py-0.5 rounded-full ${estilo}`;}
+    function extrairLista(payload){if(Array.isArray(payload))return payload;for(const chave of ['labels','data','etiquetas'])if(Array.isArray(payload?.[chave]))return payload[chave];throw new Error('A resposta da API não contém uma lista de etiquetas.');}
+    function normalizar(payload){return extrairLista(payload).map((item,i)=>{const nome=item.name??item.nome??item.label;if(!nome)return null;const n=item.count??item.total??item.quantity??item.quantidade??item.chats?.length??item.contacts?.length;const quantidade=n==null?null:Number(n);const c=item.color??item.cor;return{nome:String(nome),quantidade:Number.isFinite(quantidade)&&quantidade>=0?quantidade:null,cor:typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c)?c:CORES[i%CORES.length]};}).filter(Boolean);}
+    function renderizarPainel(dados){
+      const quantidades=dados.every(x=>Number.isFinite(x.quantidade));const total=quantidades?dados.reduce((s,x)=>s+x.quantidade,0):null;
+      document.getElementById('total-contatos').textContent=total===null?'—':total.toLocaleString('pt-BR');
+      const lista=document.getElementById('lista-etiquetas');lista.replaceChildren();
+      if(!dados.length){const vazio=document.createElement('p');vazio.className='text-sm text-gray-500';vazio.textContent='Nenhuma etiqueta encontrada.';lista.appendChild(vazio);}
+      dados.forEach(x=>{const row=document.createElement('div');row.className='flex justify-between items-center p-2 rounded-lg bg-gray-50';const left=document.createElement('div');left.className='flex items-center gap-2.5 min-w-0';const dot=document.createElement('span');dot.className='w-3.5 h-3.5 rounded-full shrink-0';dot.style.backgroundColor=x.cor;const name=document.createElement('span');name.className='text-sm font-medium truncate';name.textContent=x.nome;left.append(dot,name);const value=document.createElement('span');value.className='text-sm font-bold shrink-0';value.textContent=x.quantidade===null?'—':`${x.quantidade.toLocaleString('pt-BR')} (${total>0?((x.quantidade/total)*100).toFixed(1):'0.0'}%)`;row.append(left,value);lista.appendChild(row);});
+      const canvas=document.getElementById('graficoEtiquetas'),aviso=document.getElementById('aviso-grafico');if(chartInstance){chartInstance.destroy();chartInstance=null;}
+      if(!quantidades){canvas.classList.add('invisible');aviso.textContent='A API listou as etiquetas, mas não informou quantos contatos há em cada uma.';aviso.classList.remove('hidden');return;}
+      aviso.classList.add('hidden');canvas.classList.remove('invisible');if(typeof Chart==='undefined'){definirStatus('Gráfico indisponível','bg-red-100 text-red-800');return;}
+      chartInstance=new Chart(canvas.getContext('2d'),{type:'pie',data:{labels:dados.map(x=>x.nome),datasets:[{data:dados.map(x=>x.quantidade),backgroundColor:dados.map(x=>x.cor),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:15,font:{size:12}}}}}});
+    }
+    async function atualizarDados(){
+      const url=(localStorage.getItem('evo_url')||URL_API_PADRAO).replace(/\/+$/,'');const instance=localStorage.getItem('evo_instance');const apikey=sessionStorage.getItem('evo_apikey');
+      if(!instance||!apikey){renderizarPainel(dadosEtiquetas);definirStatus('Configure a API','bg-amber-100 text-amber-800');return;}
+      definirStatus('Sincronizando...','bg-blue-100 text-blue-800');
+      try{const response=await fetch(`${url}/label/findLabels/${encodeURIComponent(instance)}`,{method:'GET',headers:{apikey,Accept:'application/json'}});if(!response.ok)throw new Error(`API respondeu HTTP ${response.status}`);dadosEtiquetas=normalizar(await response.json());renderizarPainel(dadosEtiquetas);definirStatus('Conectado','bg-emerald-100 text-emerald-800');}
+      catch(error){console.error(error);definirStatus('Falha na conexão','bg-red-100 text-red-800');alert(`Não foi possível acessar a API. Verifique a URL, a instância, a chave, se o Space está ativo e se CORS está habilitado.\n\n${error.message}`);}
+    }
+    function abrirModalConfig(){document.getElementById('evo-url').value=localStorage.getItem('evo_url')||URL_API_PADRAO;document.getElementById('evo-instance').value=localStorage.getItem('evo_instance')||'';document.getElementById('evo-apikey').value=sessionStorage.getItem('evo_apikey')||'';const m=document.getElementById('modal-config');m.classList.remove('hidden');m.classList.add('flex');}
+    function fecharModalConfig(){const m=document.getElementById('modal-config');m.classList.add('hidden');m.classList.remove('flex');}
+    async function salvarConfig(){try{const u=new URL(document.getElementById('evo-url').value.trim()||URL_API_PADRAO);if(u.protocol!=='https:'&&u.hostname!=='localhost'&&u.hostname!=='127.0.0.1')throw new Error('Use HTTPS para a URL da API.');const instance=document.getElementById('evo-instance').value.trim(),key=document.getElementById('evo-apikey').value.trim();if(!instance||!key)throw new Error('Preencha o nome da instância e a API Key.');localStorage.setItem('evo_url',u.origin+u.pathname.replace(/\/+$/,''));localStorage.setItem('evo_instance',instance);sessionStorage.setItem('evo_apikey',key);fecharModalConfig();await atualizarDados();}catch(e){alert(e.message||'Informe uma URL válida.');}}
+    function limparConfig(){localStorage.removeItem('evo_url');localStorage.removeItem('evo_instance');sessionStorage.removeItem('evo_apikey');fecharModalConfig();definirStatus('Modo Teste','bg-amber-100 text-amber-800');}
+    function mudarAba(aba){const ativa=aba==='etiquetas';document.getElementById('aba-etiquetas').classList.toggle('hidden',!ativa);document.getElementById('aba-funcoes').classList.toggle('hidden',ativa);document.getElementById('nav-etiquetas').className=`flex flex-col items-center ${ativa?'text-emerald-600 font-semibold':'text-gray-400'} text-xs py-1 px-4`;document.getElementById('nav-funcoes').className=`flex flex-col items-center ${!ativa?'text-emerald-600 font-semibold':'text-gray-400'} text-xs py-1 px-4`;}
+    if(window.lucide)lucide.createIcons();renderizarPainel(dadosEtiquetas);atualizarDados();
+  </script>
 </body>
 </html>
