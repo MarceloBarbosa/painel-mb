@@ -1,13 +1,22 @@
 {
   "etiquetas": [
     { "nome": "Outros", "quantidade": 164 },
-    { "nome": "EQUIPE", "quantidade": 23 },
-    { "nome": "ACAO", "quantidade": 150 },
+    { "nome": "EQUIPE", "quantidade": 20 },
+    { "nome": "ACAO", "quantidade": 153 },
     { "nome": "LOJA", "quantidade": 13 },
     { "nome": "EMPREENDIMENTOS", "quantidade": 9 },
     { "nome": "AGENDADO", "quantidade": 5 },
     { "nome": "Investidor", "quantidade": 3 },
-    { "nome": "EM ATENDIMENTO", "quantidade": 32 },
-    { "nome": "FILTRO", "quantidade": 4 }
+    { "nome": "EM ATENDIMENTO", "quantidade": 22 },
+    { "nome": "FILTRO", "quantidade": 4 },
+    { "nome": "PROPOSTA", "quantidade": 4 },
+    { "nome": "SMART LINK", "quantidade": 99 },
+    { "nome": "SIMULAÇÃO", "quantidade": 14 },
+    { "nome": "FALAR DEPOIS", "quantidade": 17 },
+    { "nome": "1ª TRATATIVA", "quantidade": 10 },
+    { "nome": "2ª TRATATIVA", "quantidade": 3 },
+    { "nome": "3ª TRATATIVA", "quantidade": 19 },
+    { "nome": "VENDA", "quantidade": 1 },
+    { "nome": "VERIFICAR", "quantidade": 0 }
   ]
 }
