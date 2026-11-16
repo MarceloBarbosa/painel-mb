@@ -1,0 +1,13 @@
+{
+  "etiquetas": [
+    { "nome": "Outros", "quantidade": 164 },
+    { "nome": "EQUIPE", "quantidade": 23 },
+    { "nome": "ACAO", "quantidade": 150 },
+    { "nome": "LOJA", "quantidade": 13 },
+    { "nome": "EMPREENDIMENTOS", "quantidade": 9 },
+    { "nome": "AGENDADO", "quantidade": 5 },
+    { "nome": "Investidor", "quantidade": 3 },
+    { "nome": "EM ATENDIMENTO", "quantidade": 32 },
+    { "nome": "FILTRO", "quantidade": 4 }
+  ]
+}
