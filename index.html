@@ -214,7 +214,7 @@
         }
 
         async function atualizarDados() {
-            if (EVO.url && EVO.instance && EVO.key) {
+            if (!localStorage.getItem('zap_webhook_url') && EVO.url && EVO.instance && EVO.key) {
                 definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
                 try {
                     const etiquetas = await buscarEtiquetas();
@@ -290,6 +290,8 @@
             } else if (evoUrl || evoInstance || evoKey) {
                 alert('Para usar a Evolution API, preencha URL, nome da instância e chave.');
                 return;
+            } else {
+                EVO.clear();
             }
             const campo = document.getElementById('input-webhook');
             const url = campo.value.trim();
