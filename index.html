@@ -1,11 +1,270 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel MB</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#059669">
+    <title>Painel WhatsApp Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            background-color: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+    </style>
 </head>
-<body>
-  <h1>Painel MB</h1>
+<body class="pb-20 text-gray-800">
+    <header class="bg-emerald-600 text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <i data-lucide="message-square" class="w-6 h-6"></i>
+            <h1 class="font-bold text-lg tracking-tight">ZapPainel</h1>
+        </div>
+        <button onclick="abrirModalConfig()" aria-label="Configurações" class="p-2 rounded-full hover:bg-emerald-700 active:bg-emerald-800 transition">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto space-y-4">
+        <section id="aba-etiquetas" class="space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Total Etiquetados</p>
+                    <h2 id="total-contatos" class="text-2xl font-extrabold text-gray-900">0</h2>
+                </div>
+                <button onclick="atualizarDados()" class="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 active:scale-95 transition">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    Atualizar
+                </button>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-gray-700 text-base">Distribuição por Etiqueta</h3>
+                    <span id="status-conexao" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Modo Teste</span>
+                </div>
+                <div class="relative w-full h-64 flex justify-center items-center">
+                    <canvas id="graficoEtiquetas" aria-label="Gráfico de distribuição por etiqueta" role="img"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="font-bold text-gray-700 text-sm mb-3">Detalhamento</h3>
+                <div id="lista-etiquetas" class="space-y-2.5"></div>
+            </div>
+        </section>
+
+        <section id="aba-funcoes" class="hidden space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 text-center space-y-2">
+                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="plus-circle" class="w-6 h-6"></i>
+                </div>
+                <h3 class="font-bold text-gray-800">Módulos Expansíveis</h3>
+                <p class="text-sm text-gray-500">Esta área está pronta para receber as próximas ferramentas que você solicitar (disparos, CRM, relatórios, IA).</p>
+            </div>
+        </section>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 z-20 max-w-md mx-auto">
+        <button onclick="mudarAba('etiquetas')" id="nav-etiquetas" class="flex flex-col items-center text-emerald-600 font-semibold text-xs py-1 px-4">
+            <i data-lucide="pie-chart" class="w-5 h-5 mb-1"></i>
+            Etiquetas
+        </button>
+        <button onclick="mudarAba('funcoes')" id="nav-funcoes" class="flex flex-col items-center text-gray-400 font-medium text-xs py-1 px-4">
+            <i data-lucide="grid" class="w-5 h-5 mb-1"></i>
+            Mais Funções
+        </button>
+    </nav>
+
+    <div id="modal-config" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-30" onclick="if (event.target === this) fecharModalConfig()">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Conectar WhatsApp (API)</h3>
+                <button onclick="fecharModalConfig()" aria-label="Fechar" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500">Cole abaixo a URL do seu Webhook (n8n / Make / Evolution API) que retorna o JSON das etiquetas.</p>
+            <div>
+                <label for="input-webhook" class="block text-xs font-semibold text-gray-700 mb-1">URL do Webhook (Opcional)</label>
+                <input type="url" id="input-webhook" placeholder="https://seu-n8n.com" class="w-full border border-gray-300 rounded-xl p-2.5 text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="salvarConfig()" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-sm active:scale-95 transition">
+                    Salvar e Sincronizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const coresPadrao = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
+        let chartInstance = null;
+        let dadosEtiquetas = [
+            { nome: 'Novo Lead', quantidade: 42, cor: '#3b82f6' },
+            { nome: 'Orçamento Enviado', quantidade: 28, cor: '#f59e0b' },
+            { nome: 'Pagamento Pendente', quantidade: 15, cor: '#ef4444' },
+            { nome: 'Pedido Pago', quantidade: 64, cor: '#10b981' },
+            { nome: 'Suporte', quantidade: 9, cor: '#8b5cf6' }
+        ];
+
+        function definirStatus(texto, estilo) {
+            const badge = document.getElementById('status-conexao');
+            badge.textContent = texto;
+            badge.className = `text-[11px] px-2 py-0.5 rounded-full font-medium ${estilo}`;
+        }
+
+        function normalizarDados(payload) {
+            const lista = Array.isArray(payload) ? payload : payload?.etiquetas;
+            if (!Array.isArray(lista)) throw new Error('O webhook deve retornar uma lista ou um objeto com a propriedade "etiquetas".');
+
+            return lista.map((item, index) => {
+                const quantidade = Number(item.quantidade ?? item.count ?? item.total);
+                if (!item.nome || !Number.isFinite(quantidade) || quantidade < 0) {
+                    throw new Error('Cada etiqueta precisa ter "nome" e "quantidade" numérica igual ou maior que zero.');
+                }
+                const corRecebida = typeof item.cor === 'string' && /^#[0-9a-f]{6}$/i.test(item.cor) ? item.cor : coresPadrao[index % coresPadrao.length];
+                return { nome: String(item.nome), quantidade, cor: corRecebida };
+            });
+        }
+
+        function renderizarPainel(dados) {
+            const total = dados.reduce((acc, item) => acc + item.quantidade, 0);
+            document.getElementById('total-contatos').textContent = total.toLocaleString('pt-BR');
+
+            const listaEl = document.getElementById('lista-etiquetas');
+            listaEl.replaceChildren();
+            if (dados.length === 0) {
+                const vazio = document.createElement('p');
+                vazio.className = 'text-sm text-gray-500 py-2';
+                vazio.textContent = 'Nenhuma etiqueta encontrada.';
+                listaEl.appendChild(vazio);
+            }
+
+            dados.forEach(item => {
+                const percentual = total > 0 ? ((item.quantidade / total) * 100).toFixed(1) : '0.0';
+                const linha = document.createElement('div');
+                linha.className = 'flex items-center justify-between p-2 rounded-lg bg-gray-50';
+                const nomeArea = document.createElement('div');
+                nomeArea.className = 'flex items-center gap-2.5 min-w-0';
+                const ponto = document.createElement('span');
+                ponto.className = 'w-3.5 h-3.5 rounded-full inline-block shrink-0';
+                ponto.style.backgroundColor = item.cor;
+                const nome = document.createElement('span');
+                nome.className = 'text-sm font-medium text-gray-700 truncate';
+                nome.textContent = item.nome;
+                nomeArea.append(ponto, nome);
+                const valor = document.createElement('div');
+                valor.className = 'text-right shrink-0 ml-2';
+                const quantidade = document.createElement('span');
+                quantidade.className = 'text-sm font-bold text-gray-900';
+                quantidade.textContent = item.quantidade.toLocaleString('pt-BR');
+                const pct = document.createElement('span');
+                pct.className = 'text-xs text-gray-400 ml-1';
+                pct.textContent = `(${percentual}%)`;
+                valor.append(quantidade, pct);
+                linha.append(nomeArea, valor);
+                listaEl.appendChild(linha);
+            });
+
+            if (typeof Chart === 'undefined') {
+                definirStatus('Gráfico indisponível', 'bg-red-100 text-red-800');
+                return;
+            }
+            const ctx = document.getElementById('graficoEtiquetas').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: dados.map(item => item.nome),
+                    datasets: [{
+                        data: dados.map(item => item.quantidade),
+                        backgroundColor: dados.map(item => item.cor),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, padding: 15, font: { size: 12 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function atualizarDados() {
+            const webhookUrl = localStorage.getItem('zap_webhook_url');
+            if (!webhookUrl) {
+                renderizarPainel(dadosEtiquetas);
+                definirStatus('Modo Teste', 'bg-amber-100 text-amber-800');
+                return;
+            }
+
+            definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
+            try {
+                const resposta = await fetch(webhookUrl, { method: 'GET', headers: { Accept: 'application/json' } });
+                if (!resposta.ok) throw new Error(`O webhook respondeu com HTTP ${resposta.status}.`);
+                const payload = await resposta.json();
+                dadosEtiquetas = normalizarDados(payload);
+                renderizarPainel(dadosEtiquetas);
+                definirStatus('Conectado', 'bg-emerald-100 text-emerald-800');
+            } catch (erro) {
+                console.error('Falha ao sincronizar etiquetas:', erro);
+                definirStatus('Falha na conexão', 'bg-red-100 text-red-800');
+                alert(`Não foi possível carregar os dados do webhook. Confira a URL, o CORS e o formato do JSON.\n\n${erro.message}`);
+            }
+        }
+
+        function abrirModalConfig() {
+            document.getElementById('input-webhook').value = localStorage.getItem('zap_webhook_url') || '';
+            const modal = document.getElementById('modal-config');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function fecharModalConfig() {
+            const modal = document.getElementById('modal-config');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function salvarConfig() {
+            const campo = document.getElementById('input-webhook');
+            const url = campo.value.trim();
+            if (url) {
+                try {
+                    const parsed = new URL(url);
+                    if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost') throw new Error('Use uma URL HTTPS para o webhook.');
+                } catch (erro) {
+                    alert(erro.message || 'Informe uma URL válida.');
+                    return;
+                }
+                localStorage.setItem('zap_webhook_url', url);
+            } else {
+                localStorage.removeItem('zap_webhook_url');
+            }
+            fecharModalConfig();
+            await atualizarDados();
+        }
+
+        function mudarAba(aba) {
+            const etiquetasAtiva = aba === 'etiquetas';
+            document.getElementById('aba-etiquetas').classList.toggle('hidden', !etiquetasAtiva);
+            document.getElementById('aba-funcoes').classList.toggle('hidden', etiquetasAtiva);
+            document.getElementById('nav-etiquetas').className = `flex flex-col items-center ${etiquetasAtiva ? 'text-emerald-600 font-semibold' : 'text-gray-400 font-medium'} text-xs py-1 px-4`;
+            document.getElementById('nav-funcoes').className = `flex flex-col items-center ${!etiquetasAtiva ? 'text-emerald-600 font-semibold' : 'text-gray-400 font-medium'} text-xs py-1 px-4`;
+        }
+
+        if (window.lucide) lucide.createIcons();
+        renderizarPainel(dadosEtiquetas);
+        atualizarDados();
+    </script>
 </body>
 </html>
