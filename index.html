@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="evolution.js"></script>
     <style>
         body {
@@ -90,8 +91,8 @@
                 <label for="cvcrm-entrada" class="block text-xs font-semibold text-gray-700">Cole a lista de leads (uma etapa por linha)</label>
                 <p class="text-xs text-gray-500">Formato: <b>ETAPA: Nome 1; Nome 2; Nome 3</b></p>
                 <label class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium cursor-pointer active:scale-95 transition">
-                    Importar arquivo (.csv, .xls, .xlsx)
-                    <input type="file" id="cvcrm-arquivo" accept=".csv,.xls,.xlsx" onchange="importarArquivoCvCrm(this)" class="hidden">
+                    Importar arquivo (.csv, .xls, .xlsx, .pdf)
+                    <input type="file" id="cvcrm-arquivo" accept=".csv,.xls,.xlsx,.pdf" onchange="importarArquivoCvCrm(this)" class="hidden">
                 </label>
                 <textarea id="cvcrm-entrada" rows="8" autocomplete="off" class="w-full border border-gray-300 rounded-xl p-2.5 text-sm focus:outline-none focus:border-emerald-500"></textarea>
                 <button onclick="salvarCvCrm()" class="bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Salvar lista</button>
@@ -486,17 +487,73 @@
             return { etapas, ignoradas };
         }
 
+        function aplicarImportacaoCvCrm(etapas) {
+            const texto = ETAPAS_CVCRM.filter(e => etapas[e]).map(e => `${e}: ${etapas[e].join('; ')}`).join('\n');
+            document.getElementById('cvcrm-entrada').value = texto;
+            salvarCvCrm();
+            document.getElementById('status-cvcrm').textContent = `Arquivo importado: ${Object.values(etapas).flat().length} leads nas etapas do painel.`;
+        }
+
+        async function lerLinhasPdf(buffer) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+            const linhas = [];
+            for (let p = 1; p <= pdf.numPages; p++) {
+                const pagina = await pdf.getPage(p);
+                const conteudo = await pagina.getTextContent();
+                const grupos = new Map();
+                conteudo.items.forEach(item => {
+                    const y = Math.round(item.transform[5]);
+                    if (!grupos.has(y)) grupos.set(y, []);
+                    grupos.get(y).push({ x: item.transform[4], t: item.str });
+                });
+                [...grupos.keys()].sort((a, b) => b - a).forEach(y => {
+                    const texto = grupos.get(y).sort((a, b) => a.x - b.x).map(i => i.t).join(' ').replace(/\s+/g, ' ').trim();
+                    if (texto) linhas.push(texto);
+                });
+            }
+            return linhas;
+        }
+
+        function importarLinhasPdf(linhas) {
+            const etapas = {};
+            const ordem = [...ETAPAS_CVCRM].sort((a, b) => b.length - a.length);
+            linhas.forEach(linha => {
+                const chaveLinha = chaveEtapa(linha);
+                const etapa = ordem.find(e => chaveLinha.includes(chaveEtapa(e)));
+                if (!etapa) return;
+                const etapaTexto = linha.match(new RegExp(etapa.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+                let nome = etapaTexto ? linha.replace(etapaTexto[0], ' ') : linha;
+                nome = nome.replace(/[\w.+-]+@[\w.-]+|\+?\d[\d\s().-]{6,}/g, ' ').replace(/\s+/g, ' ').trim();
+                if (!/[A-Za-zÀ-ú]{2,}/.test(nome)) return;
+                (etapas[etapa] ||= []).push(nome.replace(/[;:]+/g, ' '));
+            });
+            return etapas;
+        }
+
         function importarArquivoCvCrm(input) {
             const arquivo = input.files[0];
             if (!arquivo) return;
             const status = document.getElementById('status-cvcrm');
-            if (typeof XLSX === 'undefined') {
+            const ehPdf = /\.pdf$/i.test(arquivo.name);
+            if (ehPdf && typeof pdfjsLib === 'undefined') {
+                status.textContent = 'Não consegui carregar o leitor de PDF. Verifique a conexão e tente de novo.';
+                return;
+            }
+            if (!ehPdf && typeof XLSX === 'undefined') {
                 status.textContent = 'Não consegui carregar o leitor de planilhas. Verifique a conexão e tente de novo.';
                 return;
             }
             const leitor = new FileReader();
-            leitor.onload = () => {
+            leitor.onload = async () => {
                 try {
+                    if (ehPdf) {
+                        const linhas = await lerLinhasPdf(leitor.result);
+                        const etapas = importarLinhasPdf(linhas);
+                        if (!Object.keys(etapas).length) throw new Error('Não encontrei leads com etapas conhecidas no PDF. Me envie um exemplo para eu ajustar a leitura.');
+                        aplicarImportacaoCvCrm(etapas);
+                        return;
+                    }
                     const planilha = XLSX.read(new Uint8Array(leitor.result), { type: 'array' });
                     const linhas = XLSX.utils.sheet_to_json(planilha.Sheets[planilha.SheetNames[0]], { header: 1, defval: '' });
                     const indiceCabecalho = linhas.findIndex(l => l.some(c => /nome/i.test(String(c))) && l.some(c => /situa|etapa|etiqueta|fase/i.test(String(c))));
@@ -512,10 +569,7 @@
                         if (!nome || !etapa) return;
                         (etapas[etapa] ||= []).push(nome.replace(/[;:\r\n]+/g, ' '));
                     });
-                    const texto = ETAPAS_CVCRM.filter(e => etapas[e]).map(e => `${e}: ${etapas[e].join('; ')}`).join('\n');
-                    document.getElementById('cvcrm-entrada').value = texto;
-                    salvarCvCrm();
-                    status.textContent = `Arquivo importado: ${Object.values(etapas).flat().length} leads nas etapas do painel.`;
+                    aplicarImportacaoCvCrm(etapas);
                 } catch (erro) {
                     status.textContent = erro.message;
                 }
