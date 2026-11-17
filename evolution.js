@@ -26,14 +26,23 @@ async function evoFetch(path, options = {}) {
   if (!EVO.url || !EVO.key) {
     throw new Error('Configure a URL e a chave da Evolution API primeiro.');
   }
-  const res = await fetch(`${EVO.url}${path}`, {
-    ...options,
-    headers: {
-      apikey: EVO.key,
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${EVO.url}${path}`, {
+      ...options,
+      signal: options.signal || AbortSignal.timeout(30000),
+      headers: {
+        apikey: EVO.key,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+  } catch (erro) {
+    if (erro.name === 'TimeoutError') {
+      throw new Error('A Evolution API não respondeu em 30 segundos. Se ela estiver hospedada no Render, pode estar em "sleep": tente de novo em um minuto.');
+    }
+    throw new Error('Não foi possível conectar na Evolution API. Confira a URL e o CORS.');
+  }
   if (!res.ok) {
     throw new Error(`Evolution API respondeu HTTP ${res.status}`);
   }
