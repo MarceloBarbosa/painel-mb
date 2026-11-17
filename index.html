@@ -35,6 +35,7 @@
                     <p class="text-xs text-gray-500 uppercase font-semibold">Total Etiquetados</p>
                     <h2 id="total-contatos" class="text-2xl font-extrabold text-gray-900">0</h2>
                 </div>
+                <button onclick="abrirModalContagens()" class="bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Editar contagens</button>
                 <button onclick="atualizarDados()" class="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 active:scale-95 transition">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                     Atualizar
@@ -115,10 +116,38 @@
         </div>
     </div>
 
+    <div id="modal-contagens" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-30" onclick="if (event.target === this) fecharModalContagens()">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Contagem por etiqueta</h3>
+                <button onclick="fecharModalContagens()" aria-label="Fechar" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500">Digite o número de conversas de cada etiqueta, conforme aparece em Ferramentas comerciais → Listas no WhatsApp Business.</p>
+            <div id="campos-contagens" class="space-y-2 overflow-y-auto pr-1"></div>
+            <button onclick="salvarContagens()" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-sm active:scale-95 transition">Salvar contagens</button>
+        </div>
+    </div>
+
     <script>
         const coresPadrao = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
         let chartInstance = null;
         let dadosEtiquetas = [];
+        const ETIQUETAS_PADRAO = ['Outros', 'EQUIPE', 'ACAO', 'LOJA', 'EMPREENDIMENTOS', 'AGENDADO', 'Investidor', 'EM ATENDIMENTO', 'FILTRO', 'PROPOSTA', 'SMART LINK', 'SIMULAÇÃO', 'FALAR DEPOIS', '1ª TRATATIVA', '2ª TRATATIVA', '3ª TRATATIVA', 'VENDA', 'VERIFICAR'];
+
+        function lerContagensManuais() {
+            try { return JSON.parse(localStorage.getItem('zap_contagens') || '{}'); } catch (erro) { return {}; }
+        }
+
+        function montarDadosManuais() {
+            const contagens = lerContagensManuais();
+            return ETIQUETAS_PADRAO.map((nome, i) => ({
+                nome,
+                quantidade: Number(contagens[nome]) || 0,
+                cor: coresPadrao[i % coresPadrao.length]
+            }));
+        }
 
         function definirStatus(texto, estilo) {
             const badge = document.getElementById('status-conexao');
@@ -213,40 +242,55 @@
             return evoFetch(`/chat/findChats/${encodeURIComponent(EVO.instance)}`, { method: 'POST', body: JSON.stringify({}) });
         }
 
+        function abrirModalContagens() {
+            const contagens = lerContagensManuais();
+            const campos = document.getElementById('campos-contagens');
+            campos.replaceChildren();
+            ETIQUETAS_PADRAO.forEach((nome, i) => {
+                const linha = document.createElement('div');
+                linha.className = 'flex items-center justify-between gap-3';
+                const rotulo = document.createElement('label');
+                rotulo.htmlFor = 'cont-' + i;
+                rotulo.className = 'text-sm text-gray-700 truncate';
+                rotulo.textContent = nome;
+                const campo = document.createElement('input');
+                campo.type = 'number';
+                campo.min = '0';
+                campo.id = 'cont-' + i;
+                campo.value = contagens[nome] ?? '';
+                campo.placeholder = '0';
+                campo.className = 'w-24 border border-gray-300 rounded-xl p-2 text-sm text-right focus:outline-none focus:border-emerald-500';
+                linha.append(rotulo, campo);
+                campos.appendChild(linha);
+            });
+            const modal = document.getElementById('modal-contagens');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function fecharModalContagens() {
+            const modal = document.getElementById('modal-contagens');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function salvarContagens() {
+            const contagens = {};
+            ETIQUETAS_PADRAO.forEach((nome, i) => {
+                const valor = parseInt(document.getElementById('cont-' + i).value, 10);
+                contagens[nome] = Number.isFinite(valor) && valor > 0 ? valor : 0;
+            });
+            localStorage.setItem('zap_contagens', JSON.stringify(contagens));
+            fecharModalContagens();
+            atualizarDados();
+        }
+
         async function atualizarDados() {
-            if (!localStorage.getItem('zap_webhook_url') && EVO.url && EVO.instance && EVO.key) {
-                definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
-                try {
-                    const etiquetas = await buscarEtiquetas();
-                    const lista = Array.isArray(etiquetas) ? etiquetas : (etiquetas?.labels || []);
-                    const conversas = await buscarConversas();
-                    const chats = Array.isArray(conversas) ? conversas : (conversas?.chats || conversas?.data || []);
-                    if (chats.length) console.log('Exemplo de conversa da Evolution:', chats[0]);
-                    const contagem = {};
-                    chats.forEach(c => {
-                        (c.labels || []).forEach(l => {
-                            const chave = typeof l === 'string' ? l : (l.id ?? l.labelId ?? l.name);
-                            contagem[chave] = (contagem[chave] || 0) + 1;
-                        });
-                    });
-                    dadosEtiquetas = lista.map((e, i) => ({
-                        nome: String(e.name ?? 'Sem nome'),
-                        quantidade: contagem[e.id] ?? contagem[e.name] ?? 0,
-                        cor: /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : coresPadrao[i % coresPadrao.length]
-                    }));
-                    renderizarPainel(dadosEtiquetas);
-                    definirStatus('Conectado (Evolution)', 'bg-emerald-100 text-emerald-800');
-                } catch (erro) {
-                    console.error('Falha ao buscar etiquetas na Evolution:', erro);
-                    definirStatus('Falha na conexão', 'bg-red-100 text-red-800');
-                    alert(`Não foi possível buscar as etiquetas na Evolution API.\n\n${erro.message}`);
-                }
-                return;
-            }
             const webhookUrl = localStorage.getItem('zap_webhook_url');
             if (!webhookUrl) {
+                dadosEtiquetas = montarDadosManuais();
                 renderizarPainel(dadosEtiquetas);
-                definirStatus('Modo Teste', 'bg-amber-100 text-amber-800');
+                definirStatus('Contagem manual', 'bg-amber-100 text-amber-800');
                 return;
             }
 
