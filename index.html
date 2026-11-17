@@ -355,12 +355,19 @@
 
             definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
             try {
-                const resposta = await fetch(webhookUrl, { method: 'GET', headers: { Accept: 'application/json' } });
+                // Parâmetro com a hora evita que o navegador reutilize uma resposta antiga do webhook.
+                const separador = webhookUrl.includes('?') ? '&' : '?';
+                const resposta = await fetch(`${webhookUrl}${separador}_t=${Date.now()}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: { Accept: 'application/json' }
+                });
                 if (!resposta.ok) throw new Error(`O webhook respondeu com HTTP ${resposta.status}.`);
                 const payload = await resposta.json();
                 dadosEtiquetas = normalizarDados(payload);
                 renderizarPainel(dadosEtiquetas);
-                definirStatus('Conectado', 'bg-emerald-100 text-emerald-800');
+                const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                definirStatus(`Conectado às ${hora}`, 'bg-emerald-100 text-emerald-800');
             } catch (erro) {
                 console.error('Falha ao sincronizar etiquetas:', erro);
                 definirStatus('Falha na conexão', 'bg-red-100 text-red-800');
