@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="evolution.js"></script>
     <style>
         body {
@@ -88,6 +89,8 @@
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-2">
                 <label for="cvcrm-entrada" class="block text-xs font-semibold text-gray-700">Cole a lista de leads (uma etapa por linha)</label>
                 <p class="text-xs text-gray-500">Formato: <b>ETAPA: Nome 1; Nome 2; Nome 3</b></p>
+                <label class="block text-xs font-semibold text-gray-700">Ou envie o arquivo exportado do CV (.csv, .xls ou .xlsx)</label>
+                <input type="file" id="cvcrm-arquivo" accept=".csv,.xls,.xlsx" onchange="importarArquivoCvCrm(this)" class="w-full text-xs text-gray-600">
                 <textarea id="cvcrm-entrada" rows="8" autocomplete="off" class="w-full border border-gray-300 rounded-xl p-2.5 text-sm focus:outline-none focus:border-emerald-500"></textarea>
                 <button onclick="salvarCvCrm()" class="bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Salvar lista</button>
             </div>
@@ -479,6 +482,43 @@
                 etapas[etapa] = [...(etapas[etapa] || []), ...nomes];
             });
             return { etapas, ignoradas };
+        }
+
+        function importarArquivoCvCrm(input) {
+            const arquivo = input.files[0];
+            if (!arquivo) return;
+            const status = document.getElementById('status-cvcrm');
+            if (typeof XLSX === 'undefined') {
+                status.textContent = 'Não consegui carregar o leitor de planilhas. Verifique a conexão e tente de novo.';
+                return;
+            }
+            const leitor = new FileReader();
+            leitor.onload = () => {
+                try {
+                    const planilha = XLSX.read(new Uint8Array(leitor.result), { type: 'array' });
+                    const linhas = XLSX.utils.sheet_to_json(planilha.Sheets[planilha.SheetNames[0]], { header: 1, defval: '' });
+                    const indiceCabecalho = linhas.findIndex(l => l.some(c => /nome/i.test(String(c))) && l.some(c => /situa|etapa|etiqueta|fase/i.test(String(c))));
+                    if (indiceCabecalho < 0) throw new Error('Não encontrei as colunas de nome e situação no arquivo.');
+                    const cabecalho = linhas[indiceCabecalho].map(c => String(c));
+                    const colunaNome = cabecalho.findIndex(c => /nome/i.test(c));
+                    const colunaEtapa = cabecalho.findIndex(c => /situa|etapa|etiqueta|fase/i.test(c));
+                    const etapas = {};
+                    linhas.slice(indiceCabecalho + 1).forEach(linha => {
+                        const nome = String(linha[colunaNome] ?? '').trim();
+                        const etapaLida = String(linha[colunaEtapa] ?? '').trim();
+                        const etapa = ETAPAS_CVCRM.find(e => chaveEtapa(e) === chaveEtapa(etapaLida));
+                        if (!nome || !etapa) return;
+                        (etapas[etapa] ||= []).push(nome.replace(/[;:\r\n]+/g, ' '));
+                    });
+                    const texto = ETAPAS_CVCRM.filter(e => etapas[e]).map(e => `${e}: ${etapas[e].join('; ')}`).join('\n');
+                    document.getElementById('cvcrm-entrada').value = texto;
+                    salvarCvCrm();
+                    status.textContent = `Arquivo importado: ${Object.values(etapas).flat().length} leads nas etapas do painel.`;
+                } catch (erro) {
+                    status.textContent = erro.message;
+                }
+            };
+            leitor.readAsArrayBuffer(arquivo);
         }
 
         function salvarCvCrm() {
