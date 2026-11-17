@@ -461,7 +461,7 @@
             return texto(valor);
         }
 
-        const ETAPAS_CVCRM = ['SEM INTEGRAÇÃO', 'AGUARDANDO ATENDIMENTO CORRETOR', '1ª TRATATIVA', '2ª TRATATIVA', '3ª TRATATIVA', 'EM ATENDIMENTO', 'VISITA AGENDADA', 'VISITA REALIZADA', 'EM ANÁLISE DE CRÉDITO', 'COM RESERVA', 'SIMULAÇÃO', 'VENDIDA', 'PROPOSTA', 'FILTRO'];
+        const ETAPAS_CVCRM = ['SEM INTEGRAÇÃO', 'AGUARDANDO ATENDIMENTO CORRETOR', '1ª TRATATIVA', '2ª TRATATIVA', '3ª TRATATIVA', 'EM ATENDIMENTO', 'VISITA AGENDADA', 'VISITA REALIZADA', 'EM ANÁLISE DE CRÉDITO', 'COM RESERVA', 'SIMULAÇÃO', 'VENDIDA', 'PROPOSTA', 'FILTRO', 'FALAR DEPOIS', 'PRÉ-CADASTRO'];
 
         function chaveEtapa(texto) {
             return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[ºª°\s]/g, '');
