@@ -341,37 +341,85 @@
             });
             localStorage.setItem('zap_contagens', JSON.stringify(contagens));
             fecharModalContagens();
-            enviarContagensParaReceptor(contagens);
-        }
-
-        async function enviarContagensParaReceptor(contagens) {
-            const webhookUrl = localStorage.getItem('zap_webhook_url');
-            if (!webhookUrl) {
-                atualizarDados();
-                return;
-            }
-            const urlContagens = webhookUrl.replace('/etiquetas', '/contagens');
-            const etiquetas = ETIQUETAS_PADRAO.map((nome, i) => ({
-                nome,
-                quantidade: Number(contagens[nome]) || 0,
-                cor: coresPadrao[i % coresPadrao.length]
-            }));
-            definirStatus('Enviando contagens...', 'bg-blue-100 text-blue-800');
-            try {
-                const resposta = await fetch(urlContagens, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ etiquetas })
-                });
-                if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
-            } catch (erro) {
-                definirStatus('Falha ao enviar contagens', 'bg-red-100 text-red-800');
-                return;
-            }
             atualizarDados();
         }
 
+        // Conta, para cada etiqueta, quantos chats individuais (sem grupos) a recebem.
+        // Lê as etiquetas da instância e depois percorre /chat/findChats em páginas.
+        async function buscarContagensEvolution() {
+            const respostaEtiquetas = await buscarEtiquetas();
+            const etiquetas = Array.isArray(respostaEtiquetas) ? respostaEtiquetas : (respostaEtiquetas?.labels || []);
+            if (!etiquetas.length) {
+                throw new Error('A Evolution API não retornou etiquetas. Confira se a instância é WhatsApp Business.');
+            }
+
+            const idPorNome = new Map(etiquetas.map(e => [String(e.name), String(e.id)]));
+            const idDe = (rotulo) => {
+                if (typeof rotulo === 'string') return idPorNome.get(rotulo) ?? rotulo;
+                const id = rotulo?.id ?? rotulo?.labelId;
+                return id != null ? String(id) : idPorNome.get(String(rotulo?.name));
+            };
+
+            const contagem = {};
+            const limite = 100;
+            let offset = 0;
+            let total = Infinity;
+            let chatsLidos = 0;
+            let chatsComEtiqueta = 0;
+
+            while (offset < total) {
+                const pagina = await evoFetch(`/chat/findChats/${encodeURIComponent(EVO.instance)}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ where: {}, limit: limite, offset })
+                });
+                const chats = Array.isArray(pagina) ? pagina : (pagina?.chats || pagina?.data || []);
+                if (!Array.isArray(chats) || chats.length === 0) break;
+
+                const totalPagina = Array.isArray(pagina) ? NaN : Number(pagina?.total);
+                if (Number.isFinite(totalPagina)) total = totalPagina;
+                else if (chats.length < limite) total = offset + chats.length;
+
+                chats.forEach(chat => {
+                    const ehGrupo = chat.isGroup || String(chat.remoteJid || chat.id || '').endsWith('@g.us');
+                    if (ehGrupo) return;
+                    chatsLidos++;
+                    const rotulos = Array.isArray(chat.labels) ? chat.labels : [];
+                    const ids = new Set(rotulos.map(idDe).filter(Boolean));
+                    if (ids.size > 0) chatsComEtiqueta++;
+                    ids.forEach(id => { contagem[id] = (contagem[id] || 0) + 1; });
+                });
+
+                offset += chats.length;
+            }
+
+            if (chatsLidos > 0 && chatsComEtiqueta === 0) {
+                throw new Error('Nenhum chat trouxe etiquetas em /chat/findChats. Confira a versão da Evolution API.');
+            }
+
+            return etiquetas.map((e, i) => ({
+                nome: String(e.name),
+                quantidade: contagem[String(e.id)] || 0,
+                cor: typeof e.color === 'string' && /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : coresPadrao[i % coresPadrao.length]
+            }));
+        }
+
         async function atualizarDados() {
+            // Prioridade: Evolution API direta (automática) > webhook > contagem manual.
+            if (EVO.url && EVO.key && EVO.instance) {
+                definirStatus('Consultando Evolution...', 'bg-blue-100 text-blue-800');
+                try {
+                    dadosEtiquetas = await buscarContagensEvolution();
+                    renderizarPainel(dadosEtiquetas);
+                    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    definirStatus(`Evolution às ${hora}`, 'bg-emerald-100 text-emerald-800');
+                } catch (erro) {
+                    console.error('Falha ao consultar a Evolution API:', erro);
+                    definirStatus('Falha na Evolution', 'bg-red-100 text-red-800');
+                    alert(`Não foi possível consultar a Evolution API.\n\n${erro.message}`);
+                }
+                return;
+            }
+
             const webhookUrl = localStorage.getItem('zap_webhook_url');
             if (!webhookUrl) {
                 dadosEtiquetas = montarDadosManuais();
@@ -382,12 +430,19 @@
 
             definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
             try {
-                const resposta = await fetch(webhookUrl, { method: 'GET', headers: { Accept: 'application/json' } });
+                // Parâmetro com a hora evita que o navegador reutilize uma resposta antiga do webhook.
+                const separador = webhookUrl.includes('?') ? '&' : '?';
+                const resposta = await fetch(`${webhookUrl}${separador}_t=${Date.now()}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: { Accept: 'application/json' }
+                });
                 if (!resposta.ok) throw new Error(`O webhook respondeu com HTTP ${resposta.status}.`);
                 const payload = await resposta.json();
                 dadosEtiquetas = normalizarDados(payload);
                 renderizarPainel(dadosEtiquetas);
-                definirStatus('Conectado', 'bg-emerald-100 text-emerald-800');
+                const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                definirStatus(`Conectado às ${hora}`, 'bg-emerald-100 text-emerald-800');
             } catch (erro) {
                 console.error('Falha ao sincronizar etiquetas:', erro);
                 definirStatus('Falha na conexão', 'bg-red-100 text-red-800');
