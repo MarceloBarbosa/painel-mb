@@ -78,6 +78,7 @@
                 </div>
                 <div class="flex gap-2">
                     <button onclick="carregarDocumentos()" class="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Atualizar</button>
+                    <button onclick="baixarCsvDocumentos()" class="bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Baixar CSV</button>
                     <button onclick="fecharDocumentos()" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Voltar</button>
                 </div>
             </div>
@@ -431,6 +432,45 @@
             return texto(valor);
         }
 
+        let documentosAtuais = null;
+
+        function escaparCsv(valor) {
+            const texto = String(valor ?? '');
+            return /[";\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+        }
+
+        function baixarCsvDocumentos() {
+            if (!documentosAtuais) {
+                alert('Clique em Atualizar antes de baixar o CSV.');
+                return;
+            }
+            const perguntas = documentosAtuais.questions || [];
+            const cabecalho = ['Enviado em', ...perguntas.map(q => q.title)];
+            const linhas = (documentosAtuais.submissions || []).map(envio => {
+                const porPergunta = new Map((envio.responses || []).map(r => [r.questionId, r]));
+                const colunas = perguntas.map(q => {
+                    const resposta = porPergunta.get(q.id);
+                    if (!resposta) return '';
+                    const valor = resposta.answer ?? resposta.formattedAnswer;
+                    if (q.type === 'FILE_UPLOAD') return extrairLinks(valor).join(' | ');
+                    const texto = formatarValor(valor);
+                    return texto === '—' ? '' : texto;
+                });
+                const data = envio.submittedAt ? new Date(envio.submittedAt).toLocaleString('pt-BR') : '';
+                return [data, ...colunas];
+            });
+            const csv = [cabecalho, ...linhas].map(linha => linha.map(escaparCsv).join(';')).join('\r\n');
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'documentos-recebidos.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
         function abrirDocumentos() {
             document.getElementById('aba-funcoes').classList.add('hidden');
             document.getElementById('aba-documentos').classList.remove('hidden');
@@ -456,6 +496,7 @@
             try {
                 const dados = await buscarEnviosTally(cfg.formId, cfg.token);
                 console.log('Resposta do Tally:', dados);
+                documentosAtuais = dados;
                 const envios = dados.submissions || [];
                 const perguntas = new Map((dados.questions || []).map(q => [q.id, q]));
 
@@ -495,7 +536,8 @@
                                 link.target = '_blank';
                                 link.rel = 'noopener noreferrer';
                                 link.className = 'ml-1 text-emerald-700 underline';
-                                link.textContent = `Arquivo ${i + 1}`;
+                                link.textContent = `Baixar arquivo ${i + 1}`;
+                                link.className = 'ml-1 text-emerald-700 underline';
                                 linha.appendChild(link);
                             });
                         } else {
