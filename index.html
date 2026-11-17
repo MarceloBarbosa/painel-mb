@@ -405,7 +405,14 @@
             return [...texto.matchAll(/https?:\/\/[^"\\\s]+/g)].map(m => m[0]).filter(url => !url.includes('tally.so/r/'));
         }
 
-        async function buscarEnviosTally(formId, token) {
+        function codigoFormularioTally(valor) {
+            const texto = String(valor || '').trim();
+            const dentroDaUrl = texto.match(/tally\.so\/forms\/([A-Za-z0-9]+)/);
+            return dentroDaUrl ? dentroDaUrl[1] : texto.replace(/^\/+|\/+$/g, '');
+        }
+
+        async function buscarEnviosTally(formIdBruto, token) {
+            const formId = codigoFormularioTally(formIdBruto);
             const resposta = await fetch(`https://api.tally.so/forms/${encodeURIComponent(formId)}/submissions?page=1&limit=100`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -484,7 +491,7 @@
                     lista.appendChild(card);
                 });
 
-                const total = dados.totalNumberOfSubmissions ?? envios.length;
+                const total = dados.totalNumberOfSubmissionsPerFilter?.all ?? envios.length;
                 document.getElementById('total-documentos').textContent = Number(total).toLocaleString('pt-BR');
                 status.textContent = envios.length ? '' : 'Nenhum envio encontrado para este formulário.';
             } catch (erro) {
