@@ -67,7 +67,32 @@
                     <span class="block font-bold text-gray-800 text-sm">DOCUMENTOS RECEBIDOS</span>
                     <span class="block text-xs text-gray-500">Envio de contribuições</span>
                 </button>
+                <button onclick="abrirCvCrm()" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 text-center space-y-2 active:scale-95 transition">
+                    <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                        <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                    </div>
+                    <span class="block font-bold text-gray-800 text-sm">CV CRM</span>
+                    <span class="block text-xs text-gray-500">Leads por etapa</span>
+                </button>
             </div>
+        </section>
+
+        <section id="aba-cvcrm" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-semibold">CV CRM</p>
+                    <p id="cvcrm-atualizado" class="text-xs text-gray-400">Nenhuma lista salva ainda</p>
+                </div>
+                <button onclick="fecharCvCrm()" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Voltar</button>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-2">
+                <label for="cvcrm-entrada" class="block text-xs font-semibold text-gray-700">Cole a lista de leads (uma etapa por linha)</label>
+                <p class="text-xs text-gray-500">Formato: <b>ETAPA: Nome 1; Nome 2; Nome 3</b></p>
+                <textarea id="cvcrm-entrada" rows="8" autocomplete="off" class="w-full border border-gray-300 rounded-xl p-2.5 text-sm focus:outline-none focus:border-emerald-500"></textarea>
+                <button onclick="salvarCvCrm()" class="bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Salvar lista</button>
+            </div>
+            <div id="status-cvcrm" class="text-xs text-gray-500"></div>
+            <div id="cvcrm-quadros" class="grid grid-cols-2 gap-3"></div>
         </section>
 
         <section id="aba-documentos" class="hidden space-y-4">
@@ -431,6 +456,78 @@
             return texto(valor);
         }
 
+        const ETAPAS_CVCRM = ['1ª TRATATIVA', '2ª TRATATIVA', '3ª TRATATIVA', 'EM ATENDIMENTO', 'PROPOSTA', 'FILTRO'];
+
+        function chaveEtapa(texto) {
+            return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[ºª°\s]/g, '');
+        }
+
+        function lerCvCrm() {
+            try { return JSON.parse(localStorage.getItem('zap_cvcrm') || 'null'); } catch (erro) { return null; }
+        }
+
+        function interpretarListaCvCrm(texto) {
+            const etapas = {};
+            const ignoradas = [];
+            texto.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(linha => {
+                const indice = linha.indexOf(':');
+                if (indice < 0) { ignoradas.push(linha); return; }
+                const etapaLida = linha.slice(0, indice).trim();
+                const etapa = ETAPAS_CVCRM.find(e => chaveEtapa(e) === chaveEtapa(etapaLida));
+                if (!etapa) { ignoradas.push(etapaLida); return; }
+                const nomes = linha.slice(indice + 1).split(';').map(n => n.trim()).filter(Boolean);
+                etapas[etapa] = [...(etapas[etapa] || []), ...nomes];
+            });
+            return { etapas, ignoradas };
+        }
+
+        function salvarCvCrm() {
+            const texto = document.getElementById('cvcrm-entrada').value;
+            const { etapas, ignoradas } = interpretarListaCvCrm(texto);
+            localStorage.setItem('zap_cvcrm', JSON.stringify({ atualizadoEm: new Date().toISOString(), texto, etapas }));
+            renderizarCvCrm();
+            document.getElementById('status-cvcrm').textContent = ignoradas.length
+                ? `Linhas ignoradas (etapa não reconhecida ou sem ':'): ${ignoradas.join(' | ')}`
+                : 'Lista salva neste navegador.';
+        }
+
+        function renderizarCvCrm() {
+            const dados = lerCvCrm();
+            const quadros = document.getElementById('cvcrm-quadros');
+            quadros.replaceChildren();
+            document.getElementById('cvcrm-atualizado').textContent = dados?.atualizadoEm
+                ? 'Atualizado em ' + new Date(dados.atualizadoEm).toLocaleString('pt-BR')
+                : 'Nenhuma lista salva ainda';
+            ETAPAS_CVCRM.forEach(etapa => {
+                const nomes = dados?.etapas?.[etapa] || [];
+                const card = document.createElement('div');
+                card.className = 'bg-white p-3 rounded-xl shadow-sm border border-gray-100 space-y-1.5';
+                const titulo = document.createElement('p');
+                titulo.className = 'text-xs font-bold text-gray-700 uppercase';
+                titulo.textContent = `${etapa} (${nomes.length})`;
+                card.appendChild(titulo);
+                nomes.forEach(nome => {
+                    const item = document.createElement('p');
+                    item.className = 'text-xs text-gray-600 truncate';
+                    item.textContent = nome;
+                    card.appendChild(item);
+                });
+                quadros.appendChild(card);
+            });
+            if (dados?.texto) document.getElementById('cvcrm-entrada').value = dados.texto;
+        }
+
+        function abrirCvCrm() {
+            document.getElementById('aba-funcoes').classList.add('hidden');
+            document.getElementById('aba-cvcrm').classList.remove('hidden');
+            renderizarCvCrm();
+        }
+
+        function fecharCvCrm() {
+            document.getElementById('aba-cvcrm').classList.add('hidden');
+            document.getElementById('aba-funcoes').classList.remove('hidden');
+        }
+
         function abrirDocumentos() {
             document.getElementById('aba-funcoes').classList.add('hidden');
             document.getElementById('aba-documentos').classList.remove('hidden');
@@ -529,6 +626,7 @@
             document.getElementById('aba-etiquetas').classList.toggle('hidden', !etiquetasAtiva);
             document.getElementById('aba-funcoes').classList.toggle('hidden', etiquetasAtiva);
             document.getElementById('aba-documentos').classList.add('hidden');
+            document.getElementById('aba-cvcrm').classList.add('hidden');
             document.getElementById('nav-etiquetas').className = `flex flex-col items-center ${etiquetasAtiva ? 'text-emerald-600 font-semibold' : 'text-gray-400 font-medium'} text-xs py-1 px-4`;
             document.getElementById('nav-funcoes').className = `flex flex-col items-center ${!etiquetasAtiva ? 'text-emerald-600 font-semibold' : 'text-gray-400 font-medium'} text-xs py-1 px-4`;
         }
