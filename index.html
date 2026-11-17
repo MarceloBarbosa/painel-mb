@@ -64,8 +64,8 @@
                     <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                         <i data-lucide="file-text" class="w-6 h-6"></i>
                     </div>
-                    <span class="block font-bold text-gray-800 text-sm">Documentos</span>
-                    <span class="block text-xs text-gray-500">Envios do Tally</span>
+                    <span class="block font-bold text-gray-800 text-sm">DOCUMENTOS RECEBIDOS</span>
+                    <span class="block text-xs text-gray-500">Envio de contribuições</span>
                 </button>
             </div>
         </section>
@@ -73,7 +73,7 @@
         <section id="aba-documentos" class="hidden space-y-4">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
                 <div>
-                    <p class="text-xs text-gray-500 uppercase font-semibold">Documentos enviados</p>
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Documentos recebidos</p>
                     <h2 id="total-documentos" class="text-2xl font-extrabold text-gray-900">0</h2>
                 </div>
                 <div class="flex gap-2">
@@ -422,6 +422,15 @@
             return resposta.json();
         }
 
+        function formatarValor(valor) {
+            if (valor === null || valor === undefined || valor === '') return '—';
+            const texto = item => (typeof item === 'object' && item !== null)
+                ? (item.text ?? item.name ?? JSON.stringify(item))
+                : String(item);
+            if (Array.isArray(valor)) return valor.length ? valor.map(texto).join(', ') : '—';
+            return texto(valor);
+        }
+
         function abrirDocumentos() {
             document.getElementById('aba-funcoes').classList.add('hidden');
             document.getElementById('aba-documentos').classList.remove('hidden');
@@ -455,9 +464,6 @@
                     const respostaNome = respostas.find(r => /nome/i.test(perguntas.get(r.questionId)?.title || ''));
                     const valorNome = respostaNome ? (respostaNome.formattedAnswer ?? respostaNome.answer) : '';
                     const nome = (typeof valorNome === 'string' && valorNome.trim()) ? valorNome : 'Sem nome';
-                    const arquivos = respostas
-                        .filter(r => perguntas.get(r.questionId)?.type === 'FILE_UPLOAD')
-                        .flatMap(r => extrairLinks(r.answer ?? r.formattedAnswer ?? []));
                     const data = envio.submittedAt ? new Date(envio.submittedAt).toLocaleString('pt-BR') : '';
 
                     const card = document.createElement('div');
@@ -470,14 +476,32 @@
                     quando.textContent = data;
                     card.append(titulo, quando);
 
-                    arquivos.forEach((url, i) => {
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.target = '_blank';
-                        link.rel = 'noopener noreferrer';
-                        link.className = 'block text-xs text-emerald-700 underline truncate';
-                        link.textContent = `Arquivo ${i + 1}`;
-                        card.appendChild(link);
+                    respostas.forEach(r => {
+                        const pergunta = perguntas.get(r.questionId);
+                        if (!pergunta || r === respostaNome) return;
+                        const linha = document.createElement('div');
+                        linha.className = 'text-xs text-gray-700 space-y-0.5';
+                        const rotulo = document.createElement('span');
+                        rotulo.className = 'font-semibold text-gray-600';
+                        rotulo.textContent = `${pergunta.title}: `;
+                        linha.appendChild(rotulo);
+                        const valor = r.answer ?? r.formattedAnswer;
+                        if (pergunta.type === 'FILE_UPLOAD') {
+                            const urls = extrairLinks(valor);
+                            if (!urls.length) linha.append('nenhum arquivo');
+                            urls.forEach((url, i) => {
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.target = '_blank';
+                                link.rel = 'noopener noreferrer';
+                                link.className = 'ml-1 text-emerald-700 underline';
+                                link.textContent = `Arquivo ${i + 1}`;
+                                linha.appendChild(link);
+                            });
+                        } else {
+                            linha.append(formatarValor(valor));
+                        }
+                        card.appendChild(linha);
                     });
                     if (envio.previewUrl) {
                         const ver = document.createElement('a');
