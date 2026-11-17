@@ -375,9 +375,14 @@
                 const chats = Array.isArray(pagina) ? pagina : (pagina?.chats || pagina?.data || []);
                 if (!Array.isArray(chats) || chats.length === 0) break;
 
-                const totalPagina = Array.isArray(pagina) ? NaN : Number(pagina?.total);
-                if (Number.isFinite(totalPagina)) total = totalPagina;
-                else if (chats.length < limite) total = offset + chats.length;
+                // Quando a resposta é uma lista simples, ela já traz todos os chats: não paginar.
+                if (Array.isArray(pagina)) {
+                    total = chats.length;
+                } else {
+                    const totalPagina = Number(pagina?.total);
+                    if (Number.isFinite(totalPagina)) total = totalPagina;
+                    else if (chats.length < limite) total = offset + chats.length;
+                }
 
                 chats.forEach(chat => {
                     const ehGrupo = chat.isGroup || String(chat.remoteJid || chat.id || '').endsWith('@g.us');
@@ -404,8 +409,8 @@
         }
 
         async function atualizarDados() {
-            // Prioridade: Evolution API direta (automática) > webhook > contagem manual.
-            if (EVO.url && EVO.key && EVO.instance) {
+            // Prioridade: webhook (se configurado) > Evolution API direta > contagem manual.
+            if (!localStorage.getItem('zap_webhook_url') && EVO.url && EVO.key && EVO.instance) {
                 definirStatus('Consultando Evolution...', 'bg-blue-100 text-blue-800');
                 try {
                     dadosEtiquetas = await buscarContagensEvolution();
