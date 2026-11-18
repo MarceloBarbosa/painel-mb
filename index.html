@@ -98,6 +98,19 @@
             </div>
             <div id="status-cvcrm" class="text-xs text-gray-500"></div>
             <div id="cvcrm-quadros" class="space-y-3"></div>
+
+            <div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 space-y-3">
+                <div class="flex justify-between items-center gap-2">
+                    <span class="text-xs font-bold text-gray-700 uppercase">Pré-cadastros e parecer de crédito</span>
+                    <label class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer active:scale-95 transition">
+                        <i data-lucide="file-json" class="w-3.5 h-3.5"></i>
+                        Importar JSON
+                        <input type="file" id="precad-arquivo" accept=".json,application/json" onchange="importarPrecadastros(this)" class="hidden">
+                    </label>
+                </div>
+                <p id="status-precadastros" class="text-xs text-gray-500"></p>
+                <div id="lista-precadastros" class="space-y-2"></div>
+            </div>
         </section>
 
         <section id="aba-documentos" class="hidden space-y-4">
@@ -115,6 +128,18 @@
             <div id="lista-documentos" class="space-y-2.5"></div>
         </section>
     </main>
+
+    <div id="modal-parecer" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-30" onclick="if (event.target === this) fecharParecer()">
+        <div class="bg-white rounded-2xl w-full max-w-md p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 id="parecer-titulo" class="font-bold text-base">Documentos / parecer do crédito</h3>
+                <button onclick="fecharParecer()" aria-label="Fechar" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="parecer-corpo" class="space-y-3 text-sm text-gray-700"></div>
+        </div>
+    </div>
 
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 z-20 max-w-md mx-auto">
         <button onclick="mudarAba('etiquetas')" id="nav-etiquetas" class="flex flex-col items-center text-emerald-600 font-semibold text-xs py-1 px-4">
@@ -737,10 +762,148 @@
             if (dados?.texto) document.getElementById('cvcrm-entrada').value = dados.texto;
         }
 
+        // ----- Pré-cadastros e parecer de crédito -----
+        // Formato do JSON importado (lista):
+        // [{ "id": "34320", "nome": "VANESSA ALVES", "situacao": "FLEX - Reprovado - Crédito",
+        //    "parecer": { "avaliacao": "Reprovado FLEX", "orientacao": "...", "observacao": "...",
+        //                  "urlParecer": "https://...", "urlPesquisaCadastral": "https://..." } }]
+        // "parecer" ausente ou null = parecer ainda não gerado (botão fica desativado).
+
+        const CORES_SITUACAO = [
+            { chave: 'reprovad', bg: '#8b1a1a', fg: '#ffffff' },
+            { chave: 'dossie pendente', bg: '#f97316', fg: '#ffffff' },
+            { chave: 'pre aprovad', bg: '#c4a7e7', fg: '#3b0764' },
+            { chave: 'aprovad', bg: '#16a34a', fg: '#ffffff' },
+            { chave: 'condicionad', bg: '#eab308', fg: '#1f2937' },
+            { chave: 'proposta', bg: '#2563eb', fg: '#ffffff' },
+            { chave: 'contrato', bg: '#0d9488', fg: '#ffffff' },
+            { chave: 'cancelad', bg: '#6b7280', fg: '#ffffff' }
+        ];
+
+        function corSituacao(texto) {
+            const texto2 = String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            const achou = CORES_SITUACAO.find(c => texto2.includes(c.chave));
+            return achou || { bg: '#e5e7eb', fg: '#374151' };
+        }
+
+        function lerPrecadastros() {
+            try { return JSON.parse(localStorage.getItem('zap_precadastros') || '[]'); } catch (erro) { return []; }
+        }
+
+        function importarPrecadastros(input) {
+            const arquivo = input.files[0];
+            if (!arquivo) return;
+            const status = document.getElementById('status-precadastros');
+            const leitor = new FileReader();
+            leitor.onload = () => {
+                try {
+                    const lista = JSON.parse(leitor.result);
+                    if (!Array.isArray(lista)) throw new Error('O arquivo deve conter uma lista (array) de pré-cadastros.');
+                    localStorage.setItem('zap_precadastros', JSON.stringify(lista));
+                    status.textContent = `${lista.length} pré-cadastros importados.`;
+                    renderizarPrecadastros();
+                } catch (erro) {
+                    status.textContent = 'Não consegui ler o arquivo: ' + erro.message;
+                }
+                input.value = '';
+            };
+            leitor.readAsText(arquivo);
+        }
+
+        function renderizarPrecadastros() {
+            const lista = document.getElementById('lista-precadastros');
+            lista.replaceChildren();
+            const itens = lerPrecadastros();
+            if (!itens.length) {
+                const vazio = document.createElement('p');
+                vazio.className = 'text-xs text-gray-400';
+                vazio.textContent = 'Nenhum pré-cadastro importado ainda.';
+                lista.appendChild(vazio);
+                return;
+            }
+            itens.forEach((item, indice) => {
+                const linha = document.createElement('div');
+                linha.className = 'flex items-center justify-between gap-2 p-2 rounded-lg bg-gray-50';
+
+                const bloco = document.createElement('div');
+                bloco.className = 'min-w-0 flex-1 space-y-1';
+                const nome = document.createElement('p');
+                nome.className = 'text-xs font-semibold text-gray-800 truncate';
+                nome.textContent = `#${item.id ?? ''} ${item.nome ?? ''}`.trim();
+                const cor = corSituacao(item.situacao);
+                const situacao = document.createElement('span');
+                situacao.className = 'inline-block text-[11px] font-semibold px-2 py-0.5 rounded';
+                situacao.style.backgroundColor = cor.bg;
+                situacao.style.color = cor.fg;
+                situacao.textContent = item.situacao || 'Sem situação';
+                bloco.append(nome, situacao);
+
+                const temParecer = !!(item.parecer && item.parecer.avaliacao !== undefined);
+                const botao = document.createElement('button');
+                botao.className = 'shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium transition ' +
+                    (temParecer ? 'bg-emerald-600 text-white active:scale-95' : 'bg-gray-200 text-gray-400 cursor-not-allowed');
+                botao.textContent = 'Documentos/parecer do crédito';
+                botao.disabled = !temParecer;
+                if (temParecer) botao.onclick = () => abrirParecer(indice);
+
+                linha.append(bloco, botao);
+                lista.appendChild(linha);
+            });
+        }
+
+        function abrirParecer(indice) {
+            const item = lerPrecadastros()[indice];
+            if (!item || !item.parecer) return;
+            const p = item.parecer;
+            document.getElementById('parecer-titulo').textContent = `Parecer - #${item.id ?? ''} ${item.nome ?? ''}`.trim();
+            const corpo = document.getElementById('parecer-corpo');
+            corpo.replaceChildren();
+
+            const campo = (rotulo, valor) => {
+                const bloco = document.createElement('div');
+                const titulo = document.createElement('p');
+                titulo.className = 'text-xs font-semibold text-gray-500 uppercase';
+                titulo.textContent = rotulo;
+                const texto = document.createElement('p');
+                texto.className = 'whitespace-pre-line text-sm text-gray-800';
+                texto.textContent = valor || '—';
+                bloco.append(titulo, texto);
+                corpo.appendChild(bloco);
+            };
+            const link = (rotulo, url) => {
+                if (!url) return;
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.className = 'block text-sm text-emerald-700 underline';
+                a.textContent = rotulo;
+                corpo.appendChild(a);
+            };
+
+            campo('Resultado da avaliação de risco', p.avaliacao);
+            campo('Orientação da Reprovação/Condicionamento', p.orientacao);
+            campo('Observação', p.observacao);
+            link('Visualizar documento (parecer)', p.urlParecer);
+            link('Resultado da Pesquisa Cadastral (visualizar esta página)', p.urlPesquisaCadastral);
+
+            const modal = document.getElementById('modal-parecer');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function fecharParecer() {
+            const modal = document.getElementById('modal-parecer');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
         function abrirCvCrm() {
             document.getElementById('aba-funcoes').classList.add('hidden');
             document.getElementById('aba-cvcrm').classList.remove('hidden');
             renderizarCvCrm();
+            renderizarPrecadastros();
         }
 
         function fecharCvCrm() {
