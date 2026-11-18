@@ -914,11 +914,57 @@
             modal.classList.remove('flex');
         }
 
+        // Lê a URL e a chave do receptor já configurado no painel (sem pedir o token).
+        function receptorBase() {
+            const url = localStorage.getItem('zap_webhook_url');
+            if (!url) return null;
+            try {
+                const u = new URL(url);
+                return { base: u.origin, key: u.searchParams.get('key') || '' };
+            } catch (erro) { return null; }
+        }
+
+        // Busca os pré-cadastros no CV CRM pelo receptor e atualiza situações automaticamente.
+        // Mantém os pareceres já carregados (por id); os dados do CV substituem nome e situação.
+        async function sincronizarCvCrm() {
+            const status = document.getElementById('status-precadastros');
+            const rec = receptorBase();
+            if (!rec || !rec.key) {
+                if (status) status.textContent = 'Configure o receptor (URL com chave) para sincronizar com o CV CRM.';
+                return;
+            }
+            if (status) status.textContent = 'Sincronizando com o CV CRM...';
+            try {
+                const r = await fetch(rec.base + '/cv/precadastros?key=' + encodeURIComponent(rec.key));
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.erro || 'HTTP ' + r.status);
+                const porId = new Map(lerPrecadastros().map(i => [String(i.id), i]));
+                const novos = j.precadastros.map(p => {
+                    const antigo = porId.get(p.id) || {};
+                    return {
+                        ...antigo,
+                        id: p.id,
+                        nome: p.nome || antigo.nome || '',
+                        situacao: p.situacao,
+                        parecer: antigo.parecer ?? null
+                    };
+                });
+                localStorage.setItem('zap_precadastros', JSON.stringify(novos));
+                if (status) status.textContent = novos.length + ' pré-cadastros sincronizados às ' + new Date().toLocaleTimeString('pt-BR') + '.';
+                renderizarPrecadastros();
+            } catch (erro) {
+                if (status) status.textContent = 'Não consegui sincronizar (' + erro.message + '). Mostrando a última lista salva.';
+            }
+        }
+
+        window.addEventListener('load', () => { sincronizarCvCrm(); });
+
         function abrirCvCrm() {
             document.getElementById('aba-funcoes').classList.add('hidden');
             document.getElementById('aba-cvcrm').classList.remove('hidden');
             renderizarCvCrm();
             renderizarPrecadastros();
+            sincronizarCvCrm();
         }
 
         function limparListaCvCrm() {
