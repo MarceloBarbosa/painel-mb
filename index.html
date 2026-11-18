@@ -94,6 +94,7 @@
                     Enviar PDF
                     <input type="file" id="cvcrm-arquivo" accept="application/pdf,.pdf" onchange="importarArquivoCvCrm(this)" class="hidden">
                 </label>
+                <button onclick="limparListaCvCrm()" class="text-xs text-red-600 underline active:scale-95 transition">Limpar lista</button>
                 <textarea id="cvcrm-entrada" class="hidden" aria-hidden="true"></textarea>
             </div>
             <div id="status-cvcrm" class="text-xs text-gray-500"></div>
@@ -918,6 +919,15 @@
             document.getElementById('aba-cvcrm').classList.remove('hidden');
             renderizarCvCrm();
             renderizarPrecadastros();
+        }
+
+        function limparListaCvCrm() {
+            if (!confirm('Apagar a lista de leads importada?')) return;
+            localStorage.removeItem('zap_cvcrm');
+            document.getElementById('cvcrm-entrada').value = '';
+            document.getElementById('cvcrm-arquivo').value = '';
+            document.getElementById('status-cvcrm').textContent = 'Lista de leads limpa.';
+            renderizarCvCrm();
         }
 
         function fecharCvCrm() {
