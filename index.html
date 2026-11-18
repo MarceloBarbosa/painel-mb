@@ -87,17 +87,18 @@
                 </div>
                 <button onclick="fecharCvCrm()" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Voltar</button>
             </div>
-            <div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between gap-2">
-                <span class="text-xs text-gray-500">Importar lista de leads</span>
-                <label class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer active:scale-95 transition">
-                    <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
-                    Enviar PDF
-                    <input type="file" id="cvcrm-arquivo" accept="application/pdf,.pdf" onchange="importarArquivoCvCrm(this)" class="hidden">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-2">
+                <label for="cvcrm-entrada" class="block text-xs font-semibold text-gray-700">Cole a lista de leads (uma etapa por linha)</label>
+                <p class="text-xs text-gray-500">Formato: <b>ETAPA: Nome 1; Nome 2; Nome 3</b></p>
+                <label class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl text-sm font-medium cursor-pointer active:scale-95 transition">
+                    Importar arquivo (.csv, .xls, .xlsx, .pdf)
+                    <input type="file" id="cvcrm-arquivo" accept=".csv,.xls,.xlsx,.pdf" onchange="importarArquivoCvCrm(this)" class="hidden">
                 </label>
-                <textarea id="cvcrm-entrada" class="hidden" aria-hidden="true"></textarea>
+                <textarea id="cvcrm-entrada" rows="8" autocomplete="off" class="w-full border border-gray-300 rounded-xl p-2.5 text-sm focus:outline-none focus:border-emerald-500"></textarea>
+                <button onclick="salvarCvCrm()" class="bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm font-medium active:scale-95 transition">Salvar lista</button>
             </div>
             <div id="status-cvcrm" class="text-xs text-gray-500"></div>
-            <div id="cvcrm-quadros" class="space-y-3"></div>
+            <div id="cvcrm-quadros" class="grid grid-cols-2 gap-3"></div>
         </section>
 
         <section id="aba-documentos" class="hidden space-y-4">
@@ -340,90 +341,37 @@
             });
             localStorage.setItem('zap_contagens', JSON.stringify(contagens));
             fecharModalContagens();
+            enviarContagensParaReceptor(contagens);
+        }
+
+        async function enviarContagensParaReceptor(contagens) {
+            const webhookUrl = localStorage.getItem('zap_webhook_url');
+            if (!webhookUrl) {
+                atualizarDados();
+                return;
+            }
+            const urlContagens = webhookUrl.replace('/etiquetas', '/contagens');
+            const etiquetas = ETIQUETAS_PADRAO.map((nome, i) => ({
+                nome,
+                quantidade: Number(contagens[nome]) || 0,
+                cor: coresPadrao[i % coresPadrao.length]
+            }));
+            definirStatus('Enviando contagens...', 'bg-blue-100 text-blue-800');
+            try {
+                const resposta = await fetch(urlContagens, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ etiquetas })
+                });
+                if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+            } catch (erro) {
+                definirStatus('Falha ao enviar contagens', 'bg-red-100 text-red-800');
+                return;
+            }
             atualizarDados();
         }
 
-        // Conta, para cada etiqueta, quantos chats individuais (sem grupos) a recebem.
-        // Lê as etiquetas da instância e depois percorre /chat/findChats em páginas.
-        async function buscarContagensEvolution() {
-            const respostaEtiquetas = await buscarEtiquetas();
-            const etiquetas = Array.isArray(respostaEtiquetas) ? respostaEtiquetas : (respostaEtiquetas?.labels || []);
-            if (!etiquetas.length) {
-                throw new Error('A Evolution API não retornou etiquetas. Confira se a instância é WhatsApp Business.');
-            }
-
-            const idPorNome = new Map(etiquetas.map(e => [String(e.name), String(e.id)]));
-            const idDe = (rotulo) => {
-                if (typeof rotulo === 'string') return idPorNome.get(rotulo) ?? rotulo;
-                const id = rotulo?.id ?? rotulo?.labelId;
-                return id != null ? String(id) : idPorNome.get(String(rotulo?.name));
-            };
-
-            const contagem = {};
-            const limite = 100;
-            let offset = 0;
-            let total = Infinity;
-            let chatsLidos = 0;
-            let chatsComEtiqueta = 0;
-
-            while (offset < total) {
-                const pagina = await evoFetch(`/chat/findChats/${encodeURIComponent(EVO.instance)}`, {
-                    method: 'POST',
-                    body: JSON.stringify({ where: {}, limit: limite, offset })
-                });
-                const chats = Array.isArray(pagina) ? pagina : (pagina?.chats || pagina?.data || []);
-                if (!Array.isArray(chats) || chats.length === 0) break;
-
-                // Quando a resposta é uma lista simples, ela já traz todos os chats: não paginar.
-                if (Array.isArray(pagina)) {
-                    total = chats.length;
-                } else {
-                    const totalPagina = Number(pagina?.total);
-                    if (Number.isFinite(totalPagina)) total = totalPagina;
-                    else if (chats.length < limite) total = offset + chats.length;
-                }
-
-                chats.forEach(chat => {
-                    const ehGrupo = chat.isGroup || String(chat.remoteJid || chat.id || '').endsWith('@g.us');
-                    if (ehGrupo) return;
-                    chatsLidos++;
-                    const rotulos = Array.isArray(chat.labels) ? chat.labels : [];
-                    const ids = new Set(rotulos.map(idDe).filter(Boolean));
-                    if (ids.size > 0) chatsComEtiqueta++;
-                    ids.forEach(id => { contagem[id] = (contagem[id] || 0) + 1; });
-                });
-
-                offset += chats.length;
-            }
-
-            if (chatsLidos > 0 && chatsComEtiqueta === 0) {
-                throw new Error('Nenhum chat trouxe etiquetas em /chat/findChats. Confira a versão da Evolution API.');
-            }
-
-            return etiquetas.map((e, i) => ({
-                nome: String(e.name),
-                quantidade: contagem[String(e.id)] || 0,
-                cor: typeof e.color === 'string' && /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : coresPadrao[i % coresPadrao.length]
-            }));
-        }
-
         async function atualizarDados() {
-            // Prioridade: webhook (se configurado) > Evolution API direta > contagem manual.
-            if (!localStorage.getItem('zap_webhook_url') && EVO.url && EVO.key && EVO.instance) {
-                definirStatus('Consultando Evolution...', 'bg-blue-100 text-blue-800');
-                try {
-                    dadosEtiquetas = await buscarContagensEvolution();
-                    renderizarPainel(dadosEtiquetas);
-                    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                    definirStatus(`Evolution às ${hora}`, 'bg-emerald-100 text-emerald-800');
-                } catch (erro) {
-                    console.error('Falha ao consultar a Evolution API:', erro);
-                    definirStatus('Falha na Evolution', 'bg-red-100 text-red-800');
-                    alert(`Não foi possível consultar a Evolution API.\n\n${erro.message}`);
-                }
-                return;
-            }
-
             const webhookUrl = localStorage.getItem('zap_webhook_url');
             if (!webhookUrl) {
                 dadosEtiquetas = montarDadosManuais();
@@ -434,19 +382,12 @@
 
             definirStatus('Sincronizando...', 'bg-blue-100 text-blue-800');
             try {
-                // Parâmetro com a hora evita que o navegador reutilize uma resposta antiga do webhook.
-                const separador = webhookUrl.includes('?') ? '&' : '?';
-                const resposta = await fetch(`${webhookUrl}${separador}_t=${Date.now()}`, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    headers: { Accept: 'application/json' }
-                });
+                const resposta = await fetch(webhookUrl, { method: 'GET', headers: { Accept: 'application/json' } });
                 if (!resposta.ok) throw new Error(`O webhook respondeu com HTTP ${resposta.status}.`);
                 const payload = await resposta.json();
                 dadosEtiquetas = normalizarDados(payload);
                 renderizarPainel(dadosEtiquetas);
-                const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                definirStatus(`Conectado às ${hora}`, 'bg-emerald-100 text-emerald-800');
+                definirStatus('Conectado', 'bg-emerald-100 text-emerald-800');
             } catch (erro) {
                 console.error('Falha ao sincronizar etiquetas:', erro);
                 definirStatus('Falha na conexão', 'bg-red-100 text-red-800');
@@ -680,58 +621,20 @@
             document.getElementById('cvcrm-atualizado').textContent = dados?.atualizadoEm
                 ? 'Atualizado em ' + new Date(dados.atualizadoEm).toLocaleString('pt-BR')
                 : 'Nenhuma lista salva ainda';
-            const totalLeads = ETAPAS_CVCRM.reduce((acc, etapa) => acc + (dados?.etapas?.[etapa]?.length || 0), 0);
-            const resumo = document.createElement('div');
-            resumo.className = 'bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center';
-            const resumoTexto = document.createElement('span');
-            resumoTexto.className = 'text-xs font-semibold text-gray-500 uppercase';
-            resumoTexto.textContent = 'Leads na lista';
-            const resumoNumero = document.createElement('span');
-            resumoNumero.className = 'text-lg font-extrabold text-gray-900';
-            resumoNumero.textContent = totalLeads.toLocaleString('pt-BR');
-            resumo.append(resumoTexto, resumoNumero);
-            quadros.appendChild(resumo);
-
             ETAPAS_CVCRM.forEach(etapa => {
                 const nomes = dados?.etapas?.[etapa] || [];
-                const vazia = nomes.length === 0;
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 overflow-hidden';
-                card.style.borderLeftColor = vazia ? '#e5e7eb' : '#10b981';
-
-                const cabecalho = document.createElement('div');
-                cabecalho.className = 'flex justify-between items-center px-3 py-2 ' + (vazia ? 'bg-gray-50' : 'bg-emerald-50');
-                const titulo = document.createElement('span');
-                titulo.className = 'text-xs font-bold uppercase ' + (vazia ? 'text-gray-400' : 'text-emerald-800');
-                titulo.textContent = etapa;
-                const contagem = document.createElement('span');
-                contagem.className = 'text-xs font-bold px-2 py-0.5 rounded-full ' + (vazia ? 'bg-gray-200 text-gray-500' : 'bg-emerald-600 text-white');
-                contagem.textContent = nomes.length;
-                cabecalho.append(titulo, contagem);
-                card.appendChild(cabecalho);
-
-                if (vazia) {
-                    const aviso = document.createElement('p');
-                    aviso.className = 'text-xs text-gray-400 px-3 py-2';
-                    aviso.textContent = 'Nenhum lead nesta etapa';
-                    card.appendChild(aviso);
-                } else {
-                    const lista = document.createElement('ol');
-                    lista.className = 'divide-y divide-gray-100';
-                    nomes.forEach((nome, indice) => {
-                        const item = document.createElement('li');
-                        item.className = 'flex items-center gap-2.5 px-3 py-1.5';
-                        const numero = document.createElement('span');
-                        numero.className = 'text-[11px] text-gray-400 w-5 text-right shrink-0';
-                        numero.textContent = indice + 1;
-                        const nomeEl = document.createElement('span');
-                        nomeEl.className = 'text-sm text-gray-700 truncate';
-                        nomeEl.textContent = nome;
-                        item.append(numero, nomeEl);
-                        lista.appendChild(item);
-                    });
-                    card.appendChild(lista);
-                }
+                card.className = 'bg-white p-3 rounded-xl shadow-sm border border-gray-100 space-y-1.5';
+                const titulo = document.createElement('p');
+                titulo.className = 'text-xs font-bold text-gray-700 uppercase';
+                titulo.textContent = `${etapa} (${nomes.length})`;
+                card.appendChild(titulo);
+                nomes.forEach(nome => {
+                    const item = document.createElement('p');
+                    item.className = 'text-xs text-gray-600 truncate';
+                    item.textContent = nome;
+                    card.appendChild(item);
+                });
                 quadros.appendChild(card);
             });
             if (dados?.texto) document.getElementById('cvcrm-entrada').value = dados.texto;
