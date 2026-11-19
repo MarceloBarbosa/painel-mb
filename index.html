@@ -1015,16 +1015,26 @@
                     const nome = (typeof valorNome === 'string' && valorNome.trim()) ? valorNome : 'Sem nome';
                     const data = envio.submittedAt ? new Date(envio.submittedAt).toLocaleString('pt-BR') : '';
 
-                    const card = document.createElement('div');
-                    card.className = 'bg-white p-3 rounded-xl shadow-sm border border-gray-100 space-y-1.5';
+                    // Cada envio vira um acordeão: o resumo mostra nome e data; ao abrir, aparecem as respostas.
+                    const acordeao = document.createElement('details');
+                    acordeao.className = 'bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden';
+                    const resumo = document.createElement('summary');
+                    resumo.className = 'flex items-center justify-between gap-2 p-3 cursor-pointer list-none active:bg-gray-50';
+                    const textos = document.createElement('div');
+                    textos.className = 'min-w-0';
                     const titulo = document.createElement('p');
-                    titulo.className = 'text-sm font-semibold text-gray-800';
+                    titulo.className = 'text-sm font-semibold text-gray-800 truncate';
                     titulo.textContent = nome;
                     const quando = document.createElement('p');
                     quando.className = 'text-xs text-gray-400';
                     quando.textContent = data;
-                    card.append(titulo, quando);
-
+                    textos.append(titulo, quando);
+                    const seta = document.createElement('span');
+                    seta.className = 'shrink-0 text-gray-400 text-sm';
+                    seta.textContent = '▾';
+                    resumo.append(textos, seta);
+                    const card = document.createElement('div');
+                    card.className = 'px-3 pb-3 pt-2 space-y-1.5 border-t border-gray-100';
                     respostas.forEach(r => {
                         const pergunta = perguntas.get(r.questionId);
                         if (!pergunta || r === respostaNome) return;
@@ -1062,7 +1072,15 @@
                         ver.textContent = 'Ver resposta completa';
                         card.appendChild(ver);
                     }
-                    lista.appendChild(card);
+                    acordeao.append(resumo, card);
+                    seta.textContent = acordeao.open ? '▴' : '▾';
+                    acordeao.addEventListener('toggle', () => {
+                        seta.textContent = acordeao.open ? '▴' : '▾';
+                        if (acordeao.open) {
+                            lista.querySelectorAll('details').forEach(outro => { if (outro !== acordeao) outro.open = false; });
+                        }
+                    });
+                    lista.appendChild(acordeao);
                 });
 
                 const total = dados.totalNumberOfSubmissionsPerFilter?.all ?? envios.length;
